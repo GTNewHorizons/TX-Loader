@@ -36,13 +36,18 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
 
     @Override
     public String[] getASMTransformerClass() {
-        return FMLLaunchHandler.side().isClient() ? new String[] { MinecraftClassTransformer.class.getName() }
-                : new String[0];
+        if (FMLLaunchHandler.side().isClient()) {
+            return new String[] { MinecraftClassTransformer.class.getName() };
+        }
+        return null;
     }
 
     @Override
     public String getModContainerClass() {
-        return FMLLaunchHandler.side().isClient() ? "glowredman.txloader.TXLoaderModContainer" : null;
+        if (FMLLaunchHandler.side().isClient()) {
+            return "glowredman.txloader.TXLoaderModContainer";
+        }
+        return null;
     }
 
     @Override
