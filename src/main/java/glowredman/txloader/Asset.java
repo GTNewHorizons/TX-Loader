@@ -4,7 +4,7 @@ import java.io.File;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
-class Asset {
+public class Asset {
 
     String resourceLocation;
     String resourceLocationOverride;
@@ -36,7 +36,7 @@ class Asset {
         return this.source == null ? Source.ASSET : this.source;
     }
 
-    enum Source {
+    public enum Source {
 
         ASSET,
         CLIENT,
