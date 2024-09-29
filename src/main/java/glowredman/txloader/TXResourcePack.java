@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.InvalidPathException;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -37,7 +38,18 @@ public class TXResourcePack implements IResourcePack {
 
     @Override
     public boolean resourceExists(ResourceLocation rl) {
-        return Files.exists(this.getResourcePath(rl));
+        try {
+            return Files.exists(this.getResourcePath(rl));
+        } catch (InvalidPathException e) {
+            /* 
+             * Some mods load resources dynamically by id.
+             * (example: java.nio.file.InvalidPathException: Illegal char <:> at index 30: textures/blocks/bw_(extrautils:golden_bag)_n.png.mcmeta)
+             */
+            if(rl.getResourcePath().contains(":")) {
+                return false;
+            }
+            throw e;
+        }
     }
 
     @SuppressWarnings("rawtypes")
