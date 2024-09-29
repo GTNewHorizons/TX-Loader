@@ -37,6 +37,10 @@ public class TXResourcePack implements IResourcePack {
 
     @Override
     public boolean resourceExists(ResourceLocation rl) {
+        // Some mods load resources dynamically by id
+        if(rl.getResourcePath().contains(":")) {
+            return false;
+        }
         return Files.exists(this.getResourcePath(rl));
     }
 
