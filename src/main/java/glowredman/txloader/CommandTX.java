@@ -31,9 +31,8 @@ class CommandTX implements ICommand {
         return "/tx <save|add <version> <source> <resourceLocation> [resourceLocationOverride] [force]>";
     }
 
-    @SuppressWarnings("rawtypes")
     @Override
-    public List getCommandAliases() {
+    public List<String> getCommandAliases() {
         return null;
     }
 
@@ -101,9 +100,8 @@ class CommandTX implements ICommand {
         return true;
     }
 
-    @SuppressWarnings("rawtypes")
     @Override
-    public List addTabCompletionOptions(ICommandSender sender, String[] args) {
+    public List<String> addTabCompletionOptions(ICommandSender sender, String[] args) {
         int length = args.length;
         if (length == 1) {
             return CommandBase.getListOfStringsMatchingLastWord(args, "add", "save");

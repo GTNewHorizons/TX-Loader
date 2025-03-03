@@ -52,9 +52,8 @@ public class TXResourcePack implements IResourcePack {
         }
     }
 
-    @SuppressWarnings("rawtypes")
     @Override
-    public Set getResourceDomains() {
+    public Set<String> getResourceDomains() {
         if (TXLoaderCore.isRemoteReachable) {
             RemoteHandler.getAssets();
         }
