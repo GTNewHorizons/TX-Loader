@@ -19,7 +19,7 @@ import cpw.mods.fml.relauncher.IFMLLoadingPlugin.SortingIndex;
 import cpw.mods.fml.relauncher.IFMLLoadingPlugin.TransformerExclusions;
 
 @Name("TX Loader Core")
-@TransformerExclusions("glowredman.txloader")
+@TransformerExclusions({ "glowredman.txloader.TXLoaderCore", "glowredman.txloader.MinecraftClassTransformer" })
 @SortingIndex(1001)
 @MCVersion("1.7.10")
 public class TXLoaderCore implements IFMLLoadingPlugin {

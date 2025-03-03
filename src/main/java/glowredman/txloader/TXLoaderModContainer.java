@@ -1,7 +1,6 @@
 package glowredman.txloader;
 
 import java.io.File;
-import java.util.Collections;
 
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
@@ -9,7 +8,7 @@ import com.google.common.eventbus.Subscribe;
 import cpw.mods.fml.common.DummyModContainer;
 import cpw.mods.fml.common.LoadController;
 import cpw.mods.fml.common.Loader;
-import cpw.mods.fml.common.ModMetadata;
+import cpw.mods.fml.common.MetadataCollection;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
 import cpw.mods.fml.common.versioning.VersionParser;
@@ -19,15 +18,9 @@ import glowredman.txloader.progress.ProgressBarProxy;
 public class TXLoaderModContainer extends DummyModContainer {
 
     public TXLoaderModContainer() {
-        super(new ModMetadata());
-        ModMetadata md = this.getMetadata();
-        md.authorList = Collections.singletonList("glowredman");
-        md.credits = "portablejim (Additional Resources mod)";
-        md.description = "Loads official/custom assets";
-        md.modId = "txloader";
-        md.name = "TX Loader";
-        md.url = "https://github.com/glowredman/TX-Loader";
-        md.version = "GRADLETOKEN_VERSION";
+        super(
+                MetadataCollection.from(TXLoaderModContainer.class.getResourceAsStream("/mcmod.info"), "TX Loader")
+                        .getMetadataForId("txloader", null));
     }
 
     @Override
