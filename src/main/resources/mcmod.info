@@ -1,0 +1,22 @@
+{
+	"modListVersion": 2,
+	"modList": [{
+		"__comment": "",
+		"modid": "${modId}",
+		"name": "${modName}",
+		"description": "Loads official/custom assets",
+		"version": "${modVersion}",
+		"mcversion": "${minecraftVersion}",
+		"url": "https://github.com/glowredman/TX-Loader",
+		"updateUrl": "",
+		"authorList": ["glowredman"],
+		"credits": "portablejim (Additional Resources mod)",
+		"logoFile": "/txl_logo.png",
+		"screenshots": [],
+		"parent": "",
+		"requiredMods": [],
+		"dependencies": [],
+		"dependants": [],
+		"useDependencyInformation": false
+	}]
+}

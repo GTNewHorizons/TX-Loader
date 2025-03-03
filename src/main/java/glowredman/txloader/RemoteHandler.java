@@ -116,8 +116,7 @@ class RemoteHandler {
                 }
             }
 
-            try {
-                JarFile jarFile = new JarFile(jarPath.toFile());
+            try (JarFile jarFile = new JarFile(jarPath.toFile())) {
                 InputStream is = jarFile.getInputStream(jarFile.getJarEntry("assets/" + asset.resourceLocation));
                 FileUtils.copyInputStreamToFile(is, file);
             } catch (Exception e) {

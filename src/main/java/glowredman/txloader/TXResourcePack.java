@@ -1,6 +1,7 @@
 package glowredman.txloader;
 
 import java.awt.image.BufferedImage;
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
@@ -11,6 +12,8 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
+
+import javax.imageio.ImageIO;
 
 import net.minecraft.client.resources.IResourcePack;
 import net.minecraft.client.resources.data.IMetadataSection;
@@ -52,9 +55,8 @@ public class TXResourcePack implements IResourcePack {
         }
     }
 
-    @SuppressWarnings("rawtypes")
     @Override
-    public Set getResourceDomains() {
+    public Set<String> getResourceDomains() {
         if (TXLoaderCore.isRemoteReachable) {
             RemoteHandler.getAssets();
         }
@@ -88,9 +90,23 @@ public class TXResourcePack implements IResourcePack {
 
     public static class Normal extends TXResourcePack {
 
+        private final ModContainer modContainer;
+
         public Normal(ModContainer modContainer) {
             super("TX Loader Resources", TXLoaderCore.resourcesDir.toPath());
+            this.modContainer = modContainer;
             TXLoaderCore.resourcesDir.mkdir();
+        }
+
+        @Override
+        public BufferedImage getPackImage() {
+            try {
+                return ImageIO.read(
+                        new BufferedInputStream(
+                                this.getClass().getResourceAsStream(this.modContainer.getMetadata().logoFile)));
+            } catch (Exception e) {
+                return null;
+            }
         }
     }
 
