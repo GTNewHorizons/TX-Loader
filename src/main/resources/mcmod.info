@@ -1,7 +1,6 @@
 {
 	"modListVersion": 2,
 	"modList": [{
-		"__comment": "",
 		"modid": "${modId}",
 		"name": "${modName}",
 		"description": "Loads official/custom assets",
