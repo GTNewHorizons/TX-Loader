@@ -40,8 +40,6 @@ class ConfigHandler {
         }
 
         TXLoaderCore.LOGGER.info("Successfully read config file.");
-
-        moveRLAssets();
     }
 
     static boolean save() {
