@@ -57,10 +57,6 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
 
     @Override
     public void injectData(Map<String, Object> data) {
-        if (FMLLaunchHandler.side().isServer()) {
-            return;
-        }
-
         modFile = (File) data.get("coremodLocation");
         mcLocation = (File) data.get("mcLocation");
         configDir = new File(mcLocation, "config" + File.separator + "txloader");
@@ -68,6 +64,11 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
         resourcesDir.mkdirs();
         forceResourcesDir = new File(configDir, "forceload");
         forceResourcesDir.mkdirs();
+
+        if (FMLLaunchHandler.side().isServer()) {
+            ServerLangHelper.load();
+            return;
+        }
 
         isRemoteReachable = RemoteHandler.getVersions();
         JarHandler.indexJars();
