@@ -85,7 +85,7 @@ class RemoteHandler {
                 try {
                     jAsset.download(file);
                 } catch (Exception e) {
-                    TXLoaderCore.LOGGER.error("Failed to get asset! Path: " + asset.resourceLocation, e);
+                    TXLoaderCore.LOGGER.error("Failed to get asset! Path: {}", asset.resourceLocation, e);
                     failed++;
                 }
                 continue;
@@ -120,7 +120,7 @@ class RemoteHandler {
                 InputStream is = jarFile.getInputStream(jarFile.getJarEntry("assets/" + asset.resourceLocation));
                 FileUtils.copyInputStreamToFile(is, file);
             } catch (Exception e) {
-                TXLoaderCore.LOGGER.error("Failed to extract asset from jar! Path: " + asset.resourceLocation, e);
+                TXLoaderCore.LOGGER.error("Failed to extract asset from jar! Path: {}", asset.resourceLocation, e);
                 failed++;
                 continue;
             }
