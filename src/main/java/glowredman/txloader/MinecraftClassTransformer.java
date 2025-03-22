@@ -56,8 +56,7 @@ public class MinecraftClassTransformer implements IClassTransformer {
     }
 
     private static boolean isTargetNode(AbstractInsnNode node, String name) {
-        return node instanceof MethodInsnNode && ((MethodInsnNode) node).name.equals(name)
-                && ((MethodInsnNode) node).desc.equals("(Ljava/util/List;)V");
+        return node instanceof MethodInsnNode mn && mn.name.equals(name) && mn.desc.equals("(Ljava/util/List;)V");
     }
 
 }

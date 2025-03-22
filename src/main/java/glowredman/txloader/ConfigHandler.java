@@ -40,8 +40,6 @@ class ConfigHandler {
         }
 
         TXLoaderCore.LOGGER.info("Successfully read config file.");
-
-        moveRLAssets();
     }
 
     static boolean save() {
@@ -70,9 +68,9 @@ class ConfigHandler {
             for (File f : resources.listFiles()) {
                 try {
                     FileUtils.moveToDirectory(f, TXLoaderCore.resourcesDir, false);
-                    TXLoaderCore.LOGGER.debug("Successfully moved " + f.getName() + " to ./config/txloader/load/");
+                    TXLoaderCore.LOGGER.debug("Successfully moved {} to ./config/txloader/load/", f.getName());
                 } catch (Exception e) {
-                    TXLoaderCore.LOGGER.warn("Failed to move " + f.getName() + " to ./config/txloader/load/", e);
+                    TXLoaderCore.LOGGER.warn("Failed to move {} to ./config/txloader/load/", f.getName(), e);
                 }
             }
 
@@ -90,9 +88,9 @@ class ConfigHandler {
             for (File f : oresources.listFiles()) {
                 try {
                     FileUtils.moveToDirectory(f, TXLoaderCore.forceResourcesDir, false);
-                    TXLoaderCore.LOGGER.debug("Successfully moved " + f.getName() + " to ./config/txloader/forceload/");
+                    TXLoaderCore.LOGGER.debug("Successfully moved {} to ./config/txloader/forceload/", f.getName());
                 } catch (Exception e) {
-                    TXLoaderCore.LOGGER.warn("Failed to move " + f.getName() + " to ./config/txloader/forceload/", e);
+                    TXLoaderCore.LOGGER.warn("Failed to move {} to ./config/txloader/forceload/", f.getName(), e);
                 }
             }
 
