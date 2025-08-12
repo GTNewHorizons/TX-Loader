@@ -90,6 +90,7 @@ class CommandTX implements ICommand {
                     asset.forceLoad = args[5].equals("true");
                 }
             }
+            TXLoaderCore.ASSET_QUEUE.add(asset);
             TXLoaderCore.REMOTE_ASSETS.add(asset);
             sender.addChatMessage(getColoredText("Done. Don't forget to save!", EnumChatFormatting.GREEN));
         }
@@ -110,7 +111,9 @@ class CommandTX implements ICommand {
             return null;
         }
         if (length == 2) {
-            return CommandBase.getListOfStringsFromIterableMatchingLastWord(args, RemoteHandler.VERSIONS.keySet());
+            synchronized (RemoteHandler.VERSIONS) {
+                return CommandBase.getListOfStringsFromIterableMatchingLastWord(args, RemoteHandler.VERSIONS.keySet());
+            }
         }
         if (length == 3) {
             return CommandBase.getListOfStringsFromIterableMatchingLastWord(args, Source.NAMES);

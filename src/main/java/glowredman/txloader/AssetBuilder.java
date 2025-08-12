@@ -65,6 +65,7 @@ public class AssetBuilder {
      * @author glowredman
      */
     public void add() {
+        TXLoaderCore.ASSET_QUEUE.add(this.asset);
         TXLoaderCore.REMOTE_ASSETS.add(this.asset);
     }
 }

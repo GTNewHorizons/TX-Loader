@@ -58,7 +58,7 @@ public class TXResourcePack implements IResourcePack {
     @Override
     public Set<String> getResourceDomains() {
         if (TXLoaderCore.isRemoteReachable) {
-            RemoteHandler.getAssets();
+            TXLoaderCore.ASSET_QUEUE.waitForEmptyQueue();
         }
 
         File[] subDirs = this.dir.toFile().listFiles((FileFilter) DirectoryFileFilter.DIRECTORY);

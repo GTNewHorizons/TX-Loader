@@ -27,7 +27,7 @@ class JarHandler {
     static final Map<String, Path> CACHED_CLIENT_JARS = new HashMap<>();
     static final Map<String, Path> CACHED_SERVER_JARS = new HashMap<>();
 
-    static Path txloaderCache;
+    static volatile Path txloaderCache;
 
     static void indexJars() {
         String userHome = System.getProperty("user.home");
@@ -92,13 +92,17 @@ class JarHandler {
                 Pair.of(Paths.get(userHome, ".gradle", "caches", "retro_futura_gradle", "mc-vanilla"), "server.jar"));
 
         Stopwatch stopwatch = Stopwatch.createStarted();
-        for (Pair<Path, String> location : clientLocations) {
-            collect(location.getLeft(), location.getRight(), Side.CLIENT);
+        synchronized (CACHED_CLIENT_JARS) {
+            for (Pair<Path, String> location : clientLocations) {
+                collect(location.getLeft(), location.getRight(), Side.CLIENT);
+            }
         }
-        for (Pair<Path, String> location : serverLocations) {
-            collect(location.getLeft(), location.getRight(), Side.SERVER);
+        synchronized (CACHED_SERVER_JARS) {
+            for (Pair<Path, String> location : serverLocations) {
+                collect(location.getLeft(), location.getRight(), Side.SERVER);
+            }
         }
-        TXLoaderCore.LOGGER.debug("Scan for jars took {}ms", stopwatch.elapsed(TimeUnit.MILLISECONDS));
+        TXLoaderCore.LOGGER.debug("Scan for jars took {}ms", Long.toString(stopwatch.elapsed(TimeUnit.MILLISECONDS)));
     }
 
     private static void collect(Path start, String fileName, Side side) {
@@ -108,9 +112,11 @@ class JarHandler {
 
                 @Override
                 public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-                    if (!Files.isSameFile(dir, start)
-                            && !RemoteHandler.VERSIONS.containsKey(dir.getFileName().toString())) {
-                        return FileVisitResult.SKIP_SUBTREE;
+                    synchronized (RemoteHandler.VERSIONS) {
+                        if (!Files.isSameFile(dir, start)
+                                && !RemoteHandler.VERSIONS.containsKey(dir.getFileName().toString())) {
+                            return FileVisitResult.SKIP_SUBTREE;
+                        }
                     }
                     return FileVisitResult.CONTINUE;
                 }

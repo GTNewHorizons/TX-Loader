@@ -24,7 +24,7 @@ class ConfigHandler {
 
         if (!configFile.exists()) {
             try {
-                FileUtils.write(configFile, TXLoaderCore.GSON.toJson(new ArrayList<>()), StandardCharsets.UTF_8);
+                FileUtils.write(configFile, TXLoaderCore.GSON.get().toJson(new ArrayList<>()), StandardCharsets.UTF_8);
             } catch (Exception e) {
                 TXLoaderCore.LOGGER.error("Failed to create config file!", e);
             }
@@ -33,20 +33,23 @@ class ConfigHandler {
 
         try {
             TXLoaderCore.REMOTE_ASSETS.addAll(
-                    TXLoaderCore.GSON.fromJson(FileUtils.readFileToString(configFile, StandardCharsets.UTF_8), TYPE));
+                    TXLoaderCore.GSON.get()
+                            .fromJson(FileUtils.readFileToString(configFile, StandardCharsets.UTF_8), TYPE));
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed to read config file!", e);
             return;
         }
 
         TXLoaderCore.LOGGER.info("Successfully read config file.");
+
+        TXLoaderCore.REMOTE_ASSETS.forEach(TXLoaderCore.ASSET_QUEUE::add);
     }
 
     static boolean save() {
         try {
             FileUtils.write(
                     configFile,
-                    TXLoaderCore.GSON.toJson(
+                    TXLoaderCore.GSON.get().toJson(
                             TXLoaderCore.REMOTE_ASSETS.parallelStream().filter(a -> !a.addedByMod)
                                     .collect(Collectors.toList()),
                             TYPE),

@@ -25,14 +25,15 @@ import cpw.mods.fml.relauncher.IFMLLoadingPlugin.TransformerExclusions;
 public class TXLoaderCore implements IFMLLoadingPlugin {
 
     static final Logger LOGGER = LogManager.getLogger("TX Loader");
-    static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    static final ThreadLocal<Gson> GSON = ThreadLocal.withInitial(() -> new GsonBuilder().setPrettyPrinting().create());
     static final List<Asset> REMOTE_ASSETS = new ArrayList<>();
+    static final AssetQueue ASSET_QUEUE = new AssetQueue();
     static File modFile;
     static File mcLocation;
     static File configDir;
     static File resourcesDir;
     static File forceResourcesDir;
-    static boolean isRemoteReachable;
+    static volatile boolean isRemoteReachable;
 
     @Override
     public String[] getASMTransformerClass() {
@@ -70,8 +71,7 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
             return;
         }
 
-        isRemoteReachable = RemoteHandler.getVersions();
-        JarHandler.indexJars();
+        ASSET_QUEUE.start();
         ConfigHandler.load();
         ConfigHandler.moveRLAssets();
     }
