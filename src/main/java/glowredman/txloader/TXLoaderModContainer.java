@@ -44,11 +44,6 @@ public class TXLoaderModContainer extends DummyModContainer {
     }
 
     @Override
-    public Class<?> getCustomResourcePackClass() {
-        return TXResourcePack.Normal.class;
-    }
-
-    @Override
     public File getSource() {
         return TXLoaderCore.modFile;
     }

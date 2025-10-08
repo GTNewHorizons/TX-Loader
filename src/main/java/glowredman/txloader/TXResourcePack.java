@@ -1,7 +1,6 @@
 package glowredman.txloader;
 
 import java.awt.image.BufferedImage;
-import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
@@ -13,8 +12,6 @@ import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
 
-import javax.imageio.ImageIO;
-
 import net.minecraft.client.resources.IResourcePack;
 import net.minecraft.client.resources.data.IMetadataSection;
 import net.minecraft.client.resources.data.IMetadataSerializer;
@@ -22,14 +19,12 @@ import net.minecraft.util.ResourceLocation;
 
 import org.apache.commons.io.filefilter.DirectoryFileFilter;
 
-import cpw.mods.fml.common.ModContainer;
-
 public class TXResourcePack implements IResourcePack {
 
     private final String name;
     private final Path dir;
 
-    private TXResourcePack(String name, Path dir) {
+    public TXResourcePack(String name, Path dir) {
         this.name = name;
         this.dir = dir;
     }
@@ -86,35 +81,5 @@ public class TXResourcePack implements IResourcePack {
 
     private Path getResourcePath(ResourceLocation rl) {
         return this.dir.resolve(rl.getResourceDomain()).resolve(rl.getResourcePath());
-    }
-
-    public static class Normal extends TXResourcePack {
-
-        private final ModContainer modContainer;
-
-        public Normal(ModContainer modContainer) {
-            super("TX Loader Resources", TXLoaderCore.resourcesDir.toPath());
-            this.modContainer = modContainer;
-            TXLoaderCore.resourcesDir.mkdir();
-        }
-
-        @Override
-        public BufferedImage getPackImage() {
-            try {
-                return ImageIO.read(
-                        new BufferedInputStream(
-                                this.getClass().getResourceAsStream(this.modContainer.getMetadata().logoFile)));
-            } catch (Exception e) {
-                return null;
-            }
-        }
-    }
-
-    public static class Force extends TXResourcePack {
-
-        public Force() {
-            super("TX Loader Forced Resources", TXLoaderCore.forceResourcesDir.toPath());
-            TXLoaderCore.forceResourcesDir.mkdir();
-        }
     }
 }
