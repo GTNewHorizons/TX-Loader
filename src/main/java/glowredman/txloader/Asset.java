@@ -1,6 +1,6 @@
 package glowredman.txloader;
 
-import java.io.File;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
@@ -23,9 +23,9 @@ public class Asset {
         return this.resourceLocationOverride == null ? this.resourceLocation : this.resourceLocationOverride;
     }
 
-    File getFile() {
-        File path = this.forceLoad ? TXLoaderCore.forceResourcesDir : TXLoaderCore.resourcesDir;
-        return new File(path, this.getResourceLocation());
+    Path getPath() {
+        Path path = this.forceLoad ? TXLoaderCore.forceResourcesDir : TXLoaderCore.resourcesDir;
+        return path.resolve(this.getResourceLocation());
     }
 
     String getVersion() {

@@ -1,11 +1,12 @@
 package glowredman.txloader;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -13,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.jar.JarFile;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 
 import com.google.gson.JsonSyntaxException;
@@ -56,8 +56,8 @@ class RemoteHandler {
 
         for (Asset asset : TXLoaderCore.REMOTE_ASSETS) {
             bar.step(asset.getResourceLocation());
-            File file = asset.getFile();
-            if (file.exists()) {
+            Path path = asset.getPath();
+            if (Files.exists(path)) {
                 skipped++;
                 continue;
             }
@@ -83,7 +83,7 @@ class RemoteHandler {
                 }
 
                 try {
-                    jAsset.download(file);
+                    jAsset.download(path);
                 } catch (Exception e) {
                     TXLoaderCore.LOGGER.error("Failed to get asset! Path: {}", asset.resourceLocation, e);
                     failed++;
@@ -116,9 +116,9 @@ class RemoteHandler {
                 }
             }
 
-            try (JarFile jarFile = new JarFile(jarPath.toFile())) {
-                InputStream is = jarFile.getInputStream(jarFile.getJarEntry("assets/" + asset.resourceLocation));
-                FileUtils.copyInputStreamToFile(is, file);
+            try (JarFile jarFile = new JarFile(jarPath.toFile());
+                    InputStream is = jarFile.getInputStream(jarFile.getJarEntry("assets/" + asset.resourceLocation))) {
+                Files.copy(is, path);
             } catch (Exception e) {
                 TXLoaderCore.LOGGER.error("Failed to extract asset from jar! Path: {}", asset.resourceLocation, e);
                 failed++;
@@ -197,12 +197,17 @@ class RemoteHandler {
         private String url;
 
         private Path downloadJar(String version, String fileName) throws IOException {
-            File dir = JarHandler.txloaderCache.resolve(version).toFile();
-            dir.mkdirs();
-            File jar = new File(dir, fileName);
+            Path dir = JarHandler.txloaderCache.resolve(version);
+            Files.createDirectories(dir);
+            Path jar = dir.resolve(fileName);
             TXLoaderCore.LOGGER.info("Downloading {} to {}", this.url, jar);
-            FileUtils.copyURLToFile(new URL(url), jar, 2000, 10000);
-            return jar.toPath();
+            URLConnection connection = new URL(this.url).openConnection();
+            connection.setConnectTimeout(2000);
+            connection.setReadTimeout(10000);
+            try (InputStream is = connection.getInputStream()) {
+                Files.copy(is, jar);
+            }
+            return jar;
         }
     }
 
@@ -221,11 +226,16 @@ class RemoteHandler {
 
         private String hash;
 
-        private void download(File file) throws IOException {
+        private void download(Path path) throws IOException {
             URL url = this.getURL();
-            file.getParentFile().mkdirs();
-            TXLoaderCore.LOGGER.info("Downloading {} to {}", url, file);
-            FileUtils.copyURLToFile(url, file, 2000, 10000);
+            Files.createDirectories(path.getParent());
+            TXLoaderCore.LOGGER.info("Downloading {} to {}", url, path);
+            URLConnection connection = url.openConnection();
+            connection.setConnectTimeout(2000);
+            connection.setReadTimeout(10000);
+            try (InputStream is = connection.getInputStream()) {
+                Files.copy(is, path);
+            }
         }
 
         private URL getURL() throws MalformedURLException {

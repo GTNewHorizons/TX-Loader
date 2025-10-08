@@ -1,8 +1,6 @@
 package glowredman.txloader;
 
 import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -11,13 +9,12 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import net.minecraft.client.resources.IResourcePack;
 import net.minecraft.client.resources.data.IMetadataSection;
 import net.minecraft.client.resources.data.IMetadataSerializer;
 import net.minecraft.util.ResourceLocation;
-
-import org.apache.commons.io.filefilter.DirectoryFileFilter;
 
 public class TXResourcePack implements IResourcePack {
 
@@ -56,10 +53,11 @@ public class TXResourcePack implements IResourcePack {
             RemoteHandler.getAssets();
         }
 
-        File[] subDirs = this.dir.toFile().listFiles((FileFilter) DirectoryFileFilter.DIRECTORY);
         Set<String> resourceDomains = new HashSet<>();
-        for (File f : subDirs) {
-            resourceDomains.add(f.getName());
+        try (Stream<Path> dirs = Files.list(this.dir).filter(Files::isDirectory)) {
+            dirs.forEach(p -> resourceDomains.add(p.getFileName().toString()));
+        } catch (Exception e) {
+            TXLoaderCore.LOGGER.error("Failed to get resource domains of directory {}", this.dir, e);
         }
         return resourceDomains;
     }

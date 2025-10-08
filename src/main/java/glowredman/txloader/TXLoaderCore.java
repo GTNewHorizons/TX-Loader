@@ -1,6 +1,9 @@
 package glowredman.txloader;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -28,10 +31,10 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
     static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     static final List<Asset> REMOTE_ASSETS = new ArrayList<>();
     static File modFile;
-    static File mcLocation;
-    static File configDir;
-    static File resourcesDir;
-    static File forceResourcesDir;
+    static Path mcLocation;
+    static Path configDir;
+    static Path resourcesDir;
+    static Path forceResourcesDir;
     static boolean isRemoteReachable;
 
     @Override
@@ -58,12 +61,18 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
     @Override
     public void injectData(Map<String, Object> data) {
         modFile = (File) data.get("coremodLocation");
-        mcLocation = (File) data.get("mcLocation");
-        configDir = new File(mcLocation, "config" + File.separator + "txloader");
-        resourcesDir = new File(configDir, "load");
-        resourcesDir.mkdirs();
-        forceResourcesDir = new File(configDir, "forceload");
-        forceResourcesDir.mkdirs();
+        mcLocation = ((File) data.get("mcLocation")).toPath();
+        configDir = mcLocation.resolve("config").resolve("txloader");
+        resourcesDir = configDir.resolve("load");
+        forceResourcesDir = configDir.resolve("forceload");
+
+        try {
+            Files.createDirectories(resourcesDir);
+            Files.createDirectories(forceResourcesDir);
+        } catch (IOException e) {
+            LOGGER.error("Failed to create resource directories!", e);
+            return;
+        }
 
         if (FMLLaunchHandler.side().isServer()) {
             ServerLangHelper.load();
