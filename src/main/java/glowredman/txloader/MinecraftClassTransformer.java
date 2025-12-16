@@ -39,7 +39,7 @@ public class MinecraftClassTransformer implements IClassTransformer {
                                 new MethodInsnNode(
                                         Opcodes.INVOKESTATIC,
                                         "glowredman/txloader/MinecraftHook",
-                                        "insertForcePack",
+                                        "insertPacks",
                                         "(Ljava/util/List;)Ljava/util/List;",
                                         false));
                         success = true;

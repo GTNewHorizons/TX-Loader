@@ -1,39 +1,39 @@
 package glowredman.txloader;
 
-import java.io.File;
+import java.io.BufferedReader;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
-
-import org.apache.commons.io.FileUtils;
+import java.util.stream.Stream;
 
 import com.google.common.reflect.TypeToken;
 
 class ConfigHandler {
 
-    private static File configFile;
+    private static Path configFile;
     private static final Type TYPE = new TypeToken<List<Asset>>() {
 
         private static final long serialVersionUID = 1L;
     }.getType();
 
     static void load() {
-        configFile = new File(TXLoaderCore.configDir, "config.json");
+        configFile = TXLoaderCore.configDir.resolve("config.json");
 
-        if (!configFile.exists()) {
+        if (Files.notExists(configFile)) {
             try {
-                FileUtils.write(configFile, TXLoaderCore.GSON.toJson(new ArrayList<>()), StandardCharsets.UTF_8);
+                Files.write(configFile, TXLoaderCore.GSON.toJson(new ArrayList<>()).getBytes(StandardCharsets.UTF_8));
             } catch (Exception e) {
                 TXLoaderCore.LOGGER.error("Failed to create config file!", e);
             }
             return;
         }
 
-        try {
-            TXLoaderCore.REMOTE_ASSETS.addAll(
-                    TXLoaderCore.GSON.fromJson(FileUtils.readFileToString(configFile, StandardCharsets.UTF_8), TYPE));
+        try (BufferedReader reader = Files.newBufferedReader(configFile, StandardCharsets.UTF_8)) {
+            TXLoaderCore.REMOTE_ASSETS.addAll(TXLoaderCore.GSON.fromJson(reader, TYPE));
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed to read config file!", e);
             return;
@@ -44,13 +44,12 @@ class ConfigHandler {
 
     static boolean save() {
         try {
-            FileUtils.write(
+            Files.write(
                     configFile,
                     TXLoaderCore.GSON.toJson(
                             TXLoaderCore.REMOTE_ASSETS.parallelStream().filter(a -> !a.addedByMod)
                                     .collect(Collectors.toList()),
-                            TYPE),
-                    StandardCharsets.UTF_8);
+                            TYPE).getBytes(StandardCharsets.UTF_8));
             return true;
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed saving config!", e);
@@ -59,45 +58,59 @@ class ConfigHandler {
     }
 
     static void moveRLAssets() {
-        File resources = new File(TXLoaderCore.mcLocation, "resources");
-        File oresources = new File(TXLoaderCore.mcLocation, "oresources");
+        Path resources = TXLoaderCore.mcLocation.resolve("resources");
+        Path oresources = TXLoaderCore.mcLocation.resolve("oresources");
 
-        if (resources.exists()) {
+        if (Files.exists(resources)) {
             TXLoaderCore.LOGGER.info("Attempting to move assets from ./resources/ to ./config/txloader/load/ ...");
 
-            for (File f : resources.listFiles()) {
-                try {
-                    FileUtils.moveToDirectory(f, TXLoaderCore.resourcesDir, false);
-                    TXLoaderCore.LOGGER.debug("Successfully moved {} to ./config/txloader/load/", f.getName());
-                } catch (Exception e) {
-                    TXLoaderCore.LOGGER.warn("Failed to move {} to ./config/txloader/load/", f.getName(), e);
-                }
-            }
+            try (Stream<Path> files = Files.list(resources).filter(Files::isRegularFile)) {
+                files.forEach(p -> {
+                    Path target = resources.relativize(p);
+                    try {
+                        Files.move(p, TXLoaderCore.resourcesDir.resolve(target));
+                        TXLoaderCore.LOGGER
+                                .debug("Successfully moved {} to ./config/txloader/load/", target.getFileName());
+                    } catch (Exception e) {
+                        TXLoaderCore.LOGGER
+                                .warn("Failed to move {} to ./config/txloader/load/", target.getFileName(), e);
+                    }
+                });
 
-            try {
-                resources.delete();
+                try {
+                    Files.delete(resources);
+                } catch (Exception e) {
+                    TXLoaderCore.LOGGER.warn("Failed to delete ./resources/", e);
+                }
             } catch (Exception e) {
-                TXLoaderCore.LOGGER.warn("Failed to delete ./resources/", e);
+                TXLoaderCore.LOGGER.warn("Failed to iterate over files in {}", resources, e);
             }
         }
 
-        if (oresources.exists()) {
+        if (Files.exists(oresources)) {
             TXLoaderCore.LOGGER
                     .info("Attempting to move assets from ./oresources/ to ./config/txloader/forceload/ ...");
 
-            for (File f : oresources.listFiles()) {
-                try {
-                    FileUtils.moveToDirectory(f, TXLoaderCore.forceResourcesDir, false);
-                    TXLoaderCore.LOGGER.debug("Successfully moved {} to ./config/txloader/forceload/", f.getName());
-                } catch (Exception e) {
-                    TXLoaderCore.LOGGER.warn("Failed to move {} to ./config/txloader/forceload/", f.getName(), e);
-                }
-            }
+            try (Stream<Path> files = Files.list(oresources).filter(Files::isRegularFile)) {
+                files.forEach(p -> {
+                    Path target = oresources.relativize(p);
+                    try {
+                        Files.move(p, TXLoaderCore.forceResourcesDir.resolve(target));
+                        TXLoaderCore.LOGGER
+                                .debug("Successfully moved {} to ./config/txloader/forceload/", target.getFileName());
+                    } catch (Exception e) {
+                        TXLoaderCore.LOGGER
+                                .warn("Failed to move {} to ./config/txloader/forceload/", target.getFileName(), e);
+                    }
+                });
 
-            try {
-                oresources.delete();
+                try {
+                    Files.delete(oresources);
+                } catch (Exception e) {
+                    TXLoaderCore.LOGGER.warn("Failed to delete ./oresources/", e);
+                }
             } catch (Exception e) {
-                TXLoaderCore.LOGGER.warn("Failed to delete ./oresources/", e);
+                TXLoaderCore.LOGGER.warn("Failed to iterate over files in {}", resources, e);
             }
         }
     }
