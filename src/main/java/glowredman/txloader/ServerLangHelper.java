@@ -1,29 +1,31 @@
 package glowredman.txloader;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.stream.Stream;
 
 import net.minecraft.util.StringTranslate;
 
 class ServerLangHelper {
 
     static void load() {
-        for (File modDir : TXLoaderCore.resourcesDir.listFiles(File::isDirectory)) {
-            inject(modDir);
-        }
-        for (File modDir : TXLoaderCore.forceResourcesDir.listFiles(File::isDirectory)) {
-            inject(modDir);
+        try (Stream<Path> dirs = Files.list(TXLoaderCore.resourcesDir).filter(Files::isDirectory);
+                Stream<Path> forcedDirs = Files.list(TXLoaderCore.forceResourcesDir).filter(Files::isDirectory)) {
+            dirs.forEach(ServerLangHelper::inject);
+            forcedDirs.forEach(ServerLangHelper::inject);
+        } catch (IOException e) {
+            TXLoaderCore.LOGGER.error("Failed to inject lang files", e);
         }
     }
 
-    private static void inject(File modDir) {
-        File langFile = new File(modDir, "lang" + File.separatorChar + "en_US.lang");
-        if (langFile.exists()) {
+    private static void inject(Path modDir) {
+        Path langFile = modDir.resolve("lang").resolve("en_US.lang");
+        if (Files.exists(langFile)) {
             try {
-                StringTranslate.inject(new FileInputStream(langFile));
-            } catch (FileNotFoundException e) {
-                TXLoaderCore.LOGGER.error("Quantum file detected! It exists and doesn't exist at the same time...", e);
+                StringTranslate.inject(Files.newInputStream(langFile));
+            } catch (IOException e) {
+                TXLoaderCore.LOGGER.error("Failed to create InputStream for {}", modDir, e);
             }
         }
     }
