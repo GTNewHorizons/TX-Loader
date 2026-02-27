@@ -27,7 +27,7 @@ class JarHandler {
     static final Map<String, Path> CACHED_CLIENT_JARS = new HashMap<>();
     static final Map<String, Path> CACHED_SERVER_JARS = new HashMap<>();
 
-    static volatile Path txloaderCache;
+    static Path txloaderCache;
 
     static void indexJars() {
         String userHome = System.getProperty("user.home");
@@ -92,31 +92,27 @@ class JarHandler {
                 Pair.of(Paths.get(userHome, ".gradle", "caches", "retro_futura_gradle", "mc-vanilla"), "server.jar"));
 
         Stopwatch stopwatch = Stopwatch.createStarted();
-        synchronized (CACHED_CLIENT_JARS) {
-            for (Pair<Path, String> location : clientLocations) {
-                collect(location.getLeft(), location.getRight(), Side.CLIENT);
-            }
+        for (Pair<Path, String> location : clientLocations) {
+            collect(location.getLeft(), location.getRight(), Side.CLIENT);
         }
-        synchronized (CACHED_SERVER_JARS) {
-            for (Pair<Path, String> location : serverLocations) {
-                collect(location.getLeft(), location.getRight(), Side.SERVER);
-            }
+        for (Pair<Path, String> location : serverLocations) {
+            collect(location.getLeft(), location.getRight(), Side.SERVER);
         }
         TXLoaderCore.LOGGER.debug("Scan for jars took {}ms", Long.toString(stopwatch.elapsed(TimeUnit.MILLISECONDS)));
     }
 
     private static void collect(Path start, String fileName, Side side) {
-        if (!Files.isDirectory(start)) return;
+        if (!Files.isDirectory(start)) {
+            return;
+        }
         try {
             Files.walkFileTree(start, EnumSet.of(FileVisitOption.FOLLOW_LINKS), 2, new SimpleFileVisitor<Path>() {
 
                 @Override
                 public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-                    synchronized (RemoteHandler.VERSIONS) {
-                        if (!Files.isSameFile(dir, start)
-                                && !RemoteHandler.VERSIONS.containsKey(dir.getFileName().toString())) {
-                            return FileVisitResult.SKIP_SUBTREE;
-                        }
+                    if (!Files.isSameFile(dir, start)
+                            && !RemoteHandler.VERSIONS.containsKey(dir.getFileName().toString())) {
+                        return FileVisitResult.SKIP_SUBTREE;
                     }
                     return FileVisitResult.CONTINUE;
                 }
@@ -133,8 +129,11 @@ class JarHandler {
                         return FileVisitResult.CONTINUE;
                     }
 
-                    if (side.isClient()) CACHED_CLIENT_JARS.put(version, file);
-                    else CACHED_SERVER_JARS.put(version, file);
+                    if (side.isClient()) {
+                        CACHED_CLIENT_JARS.put(version, file);
+                    } else {
+                        CACHED_SERVER_JARS.put(version, file);
+                    }
                     TXLoaderCore.LOGGER.debug("Found {} jar for version {} at {}", side, version, file);
                     return FileVisitResult.SKIP_SIBLINGS;
                 }

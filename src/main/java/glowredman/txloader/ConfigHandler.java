@@ -53,7 +53,7 @@ class ConfigHandler {
                     configFile,
                     TXLoaderCore.GSON.get()
                             .toJson(
-                                    TXLoaderCore.REMOTE_ASSETS.parallelStream().filter(a -> !a.addedByMod)
+                                    TXLoaderCore.REMOTE_ASSETS.stream().filter(a -> !a.addedByMod)
                                             .collect(Collectors.toList()),
                                     TYPE)
                             .getBytes(StandardCharsets.UTF_8));

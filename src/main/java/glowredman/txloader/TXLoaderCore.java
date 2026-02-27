@@ -75,14 +75,14 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
             return;
         }
 
+        ASSET_QUEUE.start();
+        ConfigHandler.load();
+        ConfigHandler.moveRLAssets();
+
         if (FMLLaunchHandler.side().isServer()) {
             ServerLangHelper.load();
             return;
         }
-
-        ASSET_QUEUE.start();
-        ConfigHandler.load();
-        ConfigHandler.moveRLAssets();
     }
 
     @Override
