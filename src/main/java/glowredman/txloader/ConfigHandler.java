@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -70,54 +71,94 @@ class ConfigHandler {
         if (Files.exists(resources)) {
             TXLoaderCore.LOGGER.info("Attempting to move assets from ./resources/ to ./config/txloader/load/ ...");
 
-            try (Stream<Path> files = Files.list(resources).filter(Files::isRegularFile)) {
+            final BooleanHolder success = new BooleanHolder(true);
+
+            try (Stream<Path> files = Files.walk(resources).filter(Files::isRegularFile)) {
                 files.forEach(p -> {
-                    Path target = resources.relativize(p);
+                    Path targetRelative = resources.relativize(p);
+                    Path target = TXLoaderCore.resourcesDir.resolve(targetRelative);
                     try {
-                        Files.move(p, TXLoaderCore.resourcesDir.resolve(target));
-                        TXLoaderCore.LOGGER
-                                .debug("Successfully moved {} to ./config/txloader/load/", target.getFileName());
+                        Files.createDirectories(target.getParent());
+                        Files.move(p, target);
+                        TXLoaderCore.LOGGER.debug(
+                                "Successfully moved {} to ./config/txloader/load/",
+                                targetRelative.getFileName());
                     } catch (Exception e) {
                         TXLoaderCore.LOGGER
-                                .warn("Failed to move {} to ./config/txloader/load/", target.getFileName(), e);
+                                .warn("Failed to move {} to ./config/txloader/load/", targetRelative.getFileName(), e);
+                        success.value = false;
                     }
                 });
+            } catch (Exception e) {
+                TXLoaderCore.LOGGER.warn("Failed to iterate over files in {}", resources, e);
+                success.value = false;
+            }
 
-                try {
-                    Files.delete(resources);
+            if (success.value) {
+                try (Stream<Path> files = Files.walk(resources)) {
+                    files.sorted(Comparator.reverseOrder()).forEachOrdered(p -> {
+                        try {
+                            Files.delete(p);
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
                 } catch (Exception e) {
                     TXLoaderCore.LOGGER.warn("Failed to delete ./resources/", e);
                 }
-            } catch (Exception e) {
-                TXLoaderCore.LOGGER.warn("Failed to iterate over files in {}", resources, e);
             }
         }
 
         if (Files.exists(oresources)) {
-            TXLoaderCore.LOGGER
-                    .info("Attempting to move assets from ./oresources/ to ./config/txloader/forceload/ ...");
+            TXLoaderCore.LOGGER.info("Attempting to move assets from ./resources/ to ./config/txloader/forceload/ ...");
 
-            try (Stream<Path> files = Files.list(oresources).filter(Files::isRegularFile)) {
+            final BooleanHolder success = new BooleanHolder(true);
+
+            try (Stream<Path> files = Files.walk(oresources).filter(Files::isRegularFile)) {
                 files.forEach(p -> {
-                    Path target = oresources.relativize(p);
+                    Path targetRelative = oresources.relativize(p);
+                    Path target = TXLoaderCore.forceResourcesDir.resolve(targetRelative);
                     try {
-                        Files.move(p, TXLoaderCore.forceResourcesDir.resolve(target));
-                        TXLoaderCore.LOGGER
-                                .debug("Successfully moved {} to ./config/txloader/forceload/", target.getFileName());
+                        Files.createDirectories(target.getParent());
+                        Files.move(p, target);
+                        TXLoaderCore.LOGGER.debug(
+                                "Successfully moved {} to ./config/txloader/forceload/",
+                                targetRelative.getFileName());
                     } catch (Exception e) {
-                        TXLoaderCore.LOGGER
-                                .warn("Failed to move {} to ./config/txloader/forceload/", target.getFileName(), e);
+                        TXLoaderCore.LOGGER.warn(
+                                "Failed to move {} to ./config/txloader/forceload/",
+                                targetRelative.getFileName(),
+                                e);
+                        success.value = false;
                     }
                 });
+            } catch (Exception e) {
+                TXLoaderCore.LOGGER.warn("Failed to iterate over files in {}", oresources, e);
+                success.value = false;
+            }
 
-                try {
-                    Files.delete(oresources);
+            if (success.value) {
+                try (Stream<Path> files = Files.walk(oresources)) {
+                    files.sorted(Comparator.reverseOrder()).forEachOrdered(p -> {
+                        try {
+                            Files.delete(p);
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
                 } catch (Exception e) {
                     TXLoaderCore.LOGGER.warn("Failed to delete ./oresources/", e);
                 }
-            } catch (Exception e) {
-                TXLoaderCore.LOGGER.warn("Failed to iterate over files in {}", resources, e);
             }
+        }
+    }
+
+    private static class BooleanHolder {
+
+        private boolean value;
+
+        private BooleanHolder(boolean initialValue) {
+            this.value = initialValue;
         }
     }
 }
