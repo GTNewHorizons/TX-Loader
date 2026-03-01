@@ -90,7 +90,7 @@ class CommandTX implements ICommand {
                     asset.forceLoad = args[5].equals("true");
                 }
             }
-            TXLoaderCore.ASSET_QUEUE.add(asset);
+            RemoteHandler.fetchAsset(asset);
             TXLoaderCore.REMOTE_ASSETS.add(asset);
             sender.addChatMessage(getColoredText("Done. Don't forget to save!", EnumChatFormatting.GREEN));
         }

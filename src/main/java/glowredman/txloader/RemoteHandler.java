@@ -8,10 +8,12 @@ import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.jar.JarFile;
 
 import org.apache.commons.io.IOUtils;
@@ -22,19 +24,27 @@ import glowredman.txloader.Asset.Source;
 
 class RemoteHandler {
 
+    static volatile State state = State.STARTING;
     static volatile String latestRelease;
-    static final Map<String, JVersion> VERSIONS = new LinkedHashMap<>();
-    private static final Map<JVersionDetails, Map<String, JAsset>> ASSETS = new HashMap<>();
-    private static final Map<String, JVersionDetails> VERSION_DETAILS_CACHE = new HashMap<>();
+    static final Map<String, JVersion> VERSIONS = Collections.synchronizedMap(new LinkedHashMap<>());
+    private static final Map<JVersionDetails, Map<String, JAsset>> ASSETS = new ConcurrentHashMap<>();
+    private static final Map<String, JVersionDetails> VERSION_DETAILS_CACHE = new ConcurrentHashMap<>();
 
-    static boolean getVersions() {
+    enum State {
+        STARTING,
+        AVAILABLE,
+        UNAVAILABLE;
+    }
+
+    static void fetchVersions() {
         JVersionManifest manifest;
 
         try {
             manifest = downloadManifest();
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed to get Minecraft versions!", e);
-            return false;
+            state = State.UNAVAILABLE;
+            return;
         }
 
         latestRelease = manifest.latest.release;
@@ -44,78 +54,123 @@ class RemoteHandler {
         }
 
         TXLoaderCore.LOGGER.info("Successfully fetched Minecraft versions.");
-
-        return true;
+        state = State.AVAILABLE;
     }
 
-    static void getAsset(Asset asset) {
+    static void fetchAsset(Asset asset) {
         Path path = asset.getPath();
         if (Files.exists(path)) {
             return;
         }
 
         String version = asset.getVersion();
-
-        JVersionDetails versionDetails = VERSION_DETAILS_CACHE.computeIfAbsent(version, RemoteHandler::downloadDetails);
-        if (versionDetails == null) {
-            TXLoaderCore.LOGGER
-                    .error("Failed to get details for version {}! Path: {}", version, asset.resourceLocation);
-            return;
-        }
-
         Source source = asset.getSource();
 
         if (source == Source.ASSET) {
-            JAsset jAsset = ASSETS.computeIfAbsent(versionDetails, JVersionDetails::getAssets)
-                    .get(asset.resourceLocation);
+            TXLoaderCore.EXECUTOR_POOL.execute(() -> {
+                if (waitAndTestAvailability()) {
+                    return;
+                }
 
-            if (jAsset == null) {
-                TXLoaderCore.LOGGER.error("Failed to find asset {} for version {}!", asset.resourceLocation, version);
-                return;
-            }
+                JVersionDetails versionDetails = VERSION_DETAILS_CACHE
+                        .computeIfAbsent(version, RemoteHandler::downloadDetails);
 
-            try {
-                Files.createDirectories(path.getParent());
-                jAsset.download(path);
-            } catch (Exception e) {
-                TXLoaderCore.LOGGER.error("Failed to get asset! Path: {}", asset.resourceLocation, e);
-            }
+                if (versionDetails == null) {
+                    TXLoaderCore.LOGGER
+                            .error("Failed to get details for version {}! Path: {}", version, asset.resourceLocation);
+                    return;
+                }
+
+                JAsset jAsset = ASSETS.computeIfAbsent(versionDetails, JVersionDetails::getAssets)
+                        .get(asset.resourceLocation);
+
+                if (jAsset == null) {
+                    TXLoaderCore.LOGGER
+                            .error("Failed to find asset {} for version {}!", asset.resourceLocation, version);
+                    return;
+                }
+
+                try {
+                    Files.createDirectories(path.getParent());
+                    jAsset.download(path);
+                } catch (Exception e) {
+                    TXLoaderCore.LOGGER.error("Failed to get asset! Path: {}", asset.resourceLocation, e);
+                }
+
+                TXLoaderCore.LOGGER.debug("Successfully fetched {}", asset.resourceLocation);
+            });
             return;
         }
 
         // asset from client/server jar:
-        Path jarPath = source == Source.CLIENT ? JarHandler.CACHED_CLIENT_JARS.get(version)
-                : JarHandler.CACHED_SERVER_JARS.get(version);
-        if (jarPath == null) {
-            if (source == Source.CLIENT) {
-                try {
-                    jarPath = versionDetails.downloads.client.downloadJar(version, "client.jar");
-                    JarHandler.CACHED_CLIENT_JARS.put(version, jarPath);
-                } catch (Exception e) {
-                    TXLoaderCore.LOGGER.error("Failed to download client jar and no cached jar was found", e);
+        if (!JarHandler.initialized) {
+            // wait for JARs to be indexed
+            TXLoaderCore.EXECUTOR_SINGLE.execute(() -> {
+                while (!JarHandler.initialized) {
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException e) {}
+                }
+            });
+        }
+
+        TXLoaderCore.EXECUTOR_SINGLE.execute(() -> {
+            Path jarPath = source == Source.CLIENT ? JarHandler.CACHED_CLIENT_JARS.get(version)
+                    : JarHandler.CACHED_SERVER_JARS.get(version);
+
+            if (jarPath == null) {
+                if (waitAndTestAvailability()) {
                     return;
                 }
-            } else {
-                try {
-                    jarPath = versionDetails.downloads.server.downloadJar(version, "server.jar");
-                    JarHandler.CACHED_SERVER_JARS.put(version, jarPath);
-                } catch (Exception e) {
-                    TXLoaderCore.LOGGER.error("Failed to download server jar and no cached jar was found", e);
+
+                JVersionDetails versionDetails = VERSION_DETAILS_CACHE
+                        .computeIfAbsent(version, RemoteHandler::downloadDetails);
+
+                if (versionDetails == null) {
+                    TXLoaderCore.LOGGER
+                            .error("Failed to get details for version {}! Path: {}", version, asset.resourceLocation);
                     return;
+                }
+
+                if (source == Source.CLIENT) {
+                    try {
+                        jarPath = versionDetails.downloads.client.downloadJar(version, "client.jar");
+                        JarHandler.CACHED_CLIENT_JARS.put(version, jarPath);
+                    } catch (Exception e) {
+                        TXLoaderCore.LOGGER.error("Failed to download client jar and no cached jar was found", e);
+                        return;
+                    }
+                } else {
+                    try {
+                        jarPath = versionDetails.downloads.server.downloadJar(version, "server.jar");
+                        JarHandler.CACHED_SERVER_JARS.put(version, jarPath);
+                    } catch (Exception e) {
+                        TXLoaderCore.LOGGER.error("Failed to download server jar and no cached jar was found", e);
+                        return;
+                    }
                 }
             }
-        }
 
-        try (JarFile jarFile = new JarFile(jarPath.toFile())) {
-            InputStream is = jarFile.getInputStream(jarFile.getJarEntry("assets/" + asset.resourceLocation));
-            Files.createDirectories(path.getParent());
-            Files.copy(is, path);
-        } catch (Exception e) {
-            TXLoaderCore.LOGGER.error("Failed to extract asset from jar! Path: {}", asset.resourceLocation, e);
-            return;
-        }
+            try (JarFile jarFile = new JarFile(jarPath.toFile())) {
+                InputStream is = jarFile.getInputStream(jarFile.getJarEntry("assets/" + asset.resourceLocation));
+                Files.createDirectories(path.getParent());
+                Files.copy(is, path);
+            } catch (Exception e) {
+                TXLoaderCore.LOGGER.error("Failed to extract asset from jar! Path: {}", asset.resourceLocation, e);
+                return;
+            }
 
-        TXLoaderCore.LOGGER.debug("Successfully fetched {}", asset.resourceLocation);
+            TXLoaderCore.LOGGER.debug("Successfully fetched {}", asset.resourceLocation);
+        });
+    }
+
+    private static boolean waitAndTestAvailability() {
+        while (state == State.STARTING) {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {}
+        }
+        return state == State.UNAVAILABLE;
     }
 
     private static JVersionManifest downloadManifest() throws JsonSyntaxException, IOException {

@@ -44,7 +44,7 @@ class ConfigHandler {
 
         TXLoaderCore.LOGGER.info("Successfully read config file.");
 
-        TXLoaderCore.REMOTE_ASSETS.forEach(TXLoaderCore.ASSET_QUEUE::add);
+        TXLoaderCore.REMOTE_ASSETS.forEach(RemoteHandler::fetchAsset);
     }
 
     static boolean save() {

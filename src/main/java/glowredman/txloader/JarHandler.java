@@ -11,9 +11,9 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -24,8 +24,9 @@ import cpw.mods.fml.relauncher.Side;
 
 class JarHandler {
 
-    static final Map<String, Path> CACHED_CLIENT_JARS = new HashMap<>();
-    static final Map<String, Path> CACHED_SERVER_JARS = new HashMap<>();
+    static volatile boolean initialized = false;
+    static final Map<String, Path> CACHED_CLIENT_JARS = new ConcurrentHashMap<>();
+    static final Map<String, Path> CACHED_SERVER_JARS = new ConcurrentHashMap<>();
 
     static Path txloaderCache;
 
@@ -60,10 +61,13 @@ class JarHandler {
                 txloaderCache = Paths.get(userHome, ".cache", "txloader");
             }
             TXLoaderCore.LOGGER.warn(
-                    "An error occurred while the TXLoader cache path was created. The environment variable TEMP or LOCALAPPDATA could be set incorrectly. Using the default cache location: {}",
+                    "An error occurred while the TXLoader cache path was created. The environment variable TEMP or LOCALAPPDATA could be set incorrectly.",
                     txloaderCache,
                     e);
         }
+
+        TXLoaderCore.LOGGER.debug("Cache location is {}", txloaderCache);
+
         List<Pair<Path, String>> clientLocations = new ArrayList<>();
         clientLocations.add(Pair.of(txloaderCache, "client.jar"));
         clientLocations.add(Pair.of(Paths.get(userHome, "AppData", "Roaming", ".minecraft", "versions"), "%s.jar"));
@@ -99,6 +103,7 @@ class JarHandler {
             collect(location.getLeft(), location.getRight(), Side.SERVER);
         }
         TXLoaderCore.LOGGER.debug("Scan for jars took {}ms", Long.toString(stopwatch.elapsed(TimeUnit.MILLISECONDS)));
+        initialized = true;
     }
 
     private static void collect(Path start, String fileName, Side side) {

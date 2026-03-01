@@ -6,7 +6,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.IResourcePack;
 import net.minecraft.client.resources.ResourcePackRepository.Entry;
 
-@SuppressWarnings("unused")
 public class MinecraftHook {
 
     public static List<IResourcePack> insertPacks(List<IResourcePack> resourcePackList) {

@@ -49,10 +49,6 @@ public class TXResourcePack implements IResourcePack {
 
     @Override
     public Set<String> getResourceDomains() {
-        if (TXLoaderCore.isRemoteReachable) {
-            TXLoaderCore.ASSET_QUEUE.waitForEmptyQueue();
-        }
-
         Set<String> resourceDomains = new HashSet<>();
         try (Stream<Path> dirs = Files.list(this.dir).filter(Files::isDirectory)) {
             dirs.forEach(p -> resourceDomains.add(p.getFileName().toString()));

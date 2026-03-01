@@ -10,7 +10,6 @@ import cpw.mods.fml.common.DummyModContainer;
 import cpw.mods.fml.common.LoadController;
 import cpw.mods.fml.common.MetadataCollection;
 import cpw.mods.fml.common.ModMetadata;
-import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
 import cpw.mods.fml.common.versioning.VersionParser;
 import cpw.mods.fml.common.versioning.VersionRange;
@@ -53,12 +52,11 @@ public class TXLoaderModContainer extends DummyModContainer {
     }
 
     @Subscribe
-    public void preInit(FMLPreInitializationEvent event) {
-        TXLoaderCore.ASSET_QUEUE.preInitReached = true;
-    }
-
-    @Subscribe
     public void serverStarting(FMLServerStartingEvent event) {
-        event.registerServerCommand(new CommandTX());
+        if (event.getSide().isClient()) {
+            event.registerServerCommand(new CommandTX());
+        } else {
+            ServerLangHelper.load();
+        }
     }
 }
