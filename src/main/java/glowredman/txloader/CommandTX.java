@@ -111,9 +111,7 @@ class CommandTX implements ICommand {
             return null;
         }
         if (length == 2) {
-            synchronized (RemoteHandler.VERSIONS) {
-                return CommandBase.getListOfStringsFromIterableMatchingLastWord(args, RemoteHandler.VERSIONS.keySet());
-            }
+            return CommandBase.getListOfStringsFromIterableMatchingLastWord(args, RemoteHandler.VERSIONS.keySet());
         }
         if (length == 3) {
             return CommandBase.getListOfStringsFromIterableMatchingLastWord(args, Source.NAMES);
