@@ -3,6 +3,8 @@ package glowredman.txloader;
 import java.io.File;
 import java.util.jar.JarFile;
 
+import net.minecraftforge.client.ClientCommandHandler;
+
 import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
 
@@ -54,7 +56,7 @@ public class TXLoaderModContainer extends DummyModContainer {
     @Subscribe
     public void serverStarting(FMLServerStartingEvent event) {
         if (event.getSide().isClient()) {
-            event.registerServerCommand(new CommandTX());
+            ClientCommandHandler.instance.registerCommand(new CommandTX());
         } else {
             ServerLangHelper.load();
         }

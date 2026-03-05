@@ -107,9 +107,6 @@ class JarHandler {
     }
 
     private static void collect(Path start, String fileName, Side side) {
-        if (!Files.isDirectory(start)) {
-            return;
-        }
         try {
             Files.walkFileTree(start, EnumSet.of(FileVisitOption.FOLLOW_LINKS), 2, new SimpleFileVisitor<Path>() {
 

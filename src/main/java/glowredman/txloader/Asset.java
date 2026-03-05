@@ -11,7 +11,6 @@ public class Asset {
     boolean forceLoad;
     String version;
     Source source;
-    transient boolean addedByMod; // ignored by GSON
 
     Asset(String resourceLocation, String version, Source source) {
         this.resourceLocation = resourceLocation;

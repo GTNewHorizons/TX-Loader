@@ -91,7 +91,7 @@ class CommandTX implements ICommand {
                 }
             }
             RemoteHandler.fetchAsset(asset);
-            TXLoaderCore.REMOTE_ASSETS.add(asset);
+            ConfigHandler.ASSETS.add(asset);
             sender.addChatMessage(getColoredText("Done. Don't forget to save!", EnumChatFormatting.GREEN));
         }
     }

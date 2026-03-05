@@ -4,8 +4,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -32,7 +30,6 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
 
     static final Logger LOGGER = LogManager.getLogger("TX Loader");
     static final ThreadLocal<Gson> GSON = ThreadLocal.withInitial(() -> new GsonBuilder().setPrettyPrinting().create());
-    static final List<Asset> REMOTE_ASSETS = new ArrayList<>();
     static final Executor EXECUTOR_SINGLE = Executors.newSingleThreadExecutor();
     static final Executor EXECUTOR_POOL = Executors.newCachedThreadPool();
     static File modFile;
@@ -44,14 +41,14 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
     @Override
     public String[] getASMTransformerClass() {
         if (FMLLaunchHandler.side().isClient()) {
-            return new String[] { MinecraftClassTransformer.class.getName() };
+            return new String[] { "glowredman.txloader.MinecraftClassTransformer" };
         }
         return null;
     }
 
     @Override
     public String getModContainerClass() {
-        return TXLoaderModContainer.class.getName();
+        return "glowredman.txloader.TXLoaderModContainer";
     }
 
     @Override

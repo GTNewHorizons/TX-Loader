@@ -8,7 +8,6 @@ public class AssetBuilder {
 
     AssetBuilder(String resourceLocation) {
         this.asset = new Asset(resourceLocation, RemoteHandler.latestRelease, Source.ASSET);
-        this.asset.addedByMod = true;
     }
 
     /**
@@ -66,6 +65,5 @@ public class AssetBuilder {
      */
     public void add() {
         RemoteHandler.fetchAsset(this.asset);
-        TXLoaderCore.REMOTE_ASSETS.add(this.asset);
     }
 }
