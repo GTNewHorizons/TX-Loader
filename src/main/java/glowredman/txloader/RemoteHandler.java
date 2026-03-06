@@ -100,7 +100,7 @@ class RemoteHandler {
 
         // By always re-assigning the CompletableFuture, only one JAR will be fetched at a time. We want this because it
         // avoids downloading the same jar multiple times.
-        JarHandler.cacheStage = versionsStage.thenRunAsync(() -> {
+        JarHandler.cacheStage = JarHandler.cacheStage.thenRunAsync(() -> {
             Path jarPath = source == Source.CLIENT ? JarHandler.CACHED_CLIENT_JARS.get(version)
                     : JarHandler.CACHED_SERVER_JARS.get(version);
 
