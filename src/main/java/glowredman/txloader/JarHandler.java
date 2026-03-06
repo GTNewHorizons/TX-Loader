@@ -13,8 +13,11 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+
+import javax.annotation.Nullable;
 
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -24,11 +27,11 @@ import cpw.mods.fml.relauncher.Side;
 
 class JarHandler {
 
-    static volatile boolean initialized = false;
     static final Map<String, Path> CACHED_CLIENT_JARS = new ConcurrentHashMap<>();
     static final Map<String, Path> CACHED_SERVER_JARS = new ConcurrentHashMap<>();
 
-    static Path txloaderCache;
+    static @Nullable CompletionStage<Void> cacheStage;
+    static @Nullable Path txloaderCache;
 
     static void indexJars() {
         String userHome = System.getProperty("user.home");
@@ -103,7 +106,6 @@ class JarHandler {
             collect(location.getLeft(), location.getRight(), Side.SERVER);
         }
         TXLoaderCore.LOGGER.debug("Scan for jars took {}ms", Long.toString(stopwatch.elapsed(TimeUnit.MILLISECONDS)));
-        initialized = true;
     }
 
     private static void collect(Path start, String fileName, Side side) {

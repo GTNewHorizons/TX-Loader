@@ -13,8 +13,12 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.jar.JarFile;
+
+import javax.annotation.Nullable;
 
 import org.apache.commons.io.IOUtils;
 
@@ -24,17 +28,11 @@ import glowredman.txloader.Asset.Source;
 
 class RemoteHandler {
 
-    static volatile State state = State.STARTING;
-    static volatile String latestRelease;
+    static volatile @Nullable String latestRelease;
+    static @Nullable CompletionStage<Void> versionsStage;
     static final Map<String, JVersion> VERSIONS = Collections.synchronizedMap(new LinkedHashMap<>());
     private static final Map<JVersionDetails, Map<String, JAsset>> ASSETS = new ConcurrentHashMap<>();
     private static final Map<String, JVersionDetails> VERSION_DETAILS_CACHE = new ConcurrentHashMap<>();
-
-    enum State {
-        STARTING,
-        AVAILABLE,
-        UNAVAILABLE;
-    }
 
     static void fetchVersions() {
         JVersionManifest manifest;
@@ -43,8 +41,7 @@ class RemoteHandler {
             manifest = downloadManifest();
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed to get Minecraft versions!", e);
-            state = State.UNAVAILABLE;
-            return;
+            throw new CompletionException(e);
         }
 
         latestRelease = manifest.latest.release;
@@ -54,12 +51,11 @@ class RemoteHandler {
         }
 
         TXLoaderCore.LOGGER.info("Successfully fetched Minecraft versions.");
-        state = State.AVAILABLE;
     }
 
     static void fetchAsset(Asset asset) {
         Path path = asset.getPath();
-        if (Files.exists(path)) {
+        if (versionsStage == null || Files.exists(path)) {
             return;
         }
 
@@ -67,11 +63,8 @@ class RemoteHandler {
         Source source = asset.getSource();
 
         if (source == Source.ASSET) {
-            TXLoaderCore.EXECUTOR_POOL.execute(() -> {
-                if (waitAndTestAvailability()) {
-                    return;
-                }
-
+            // By always calling thenRunAsync() on the original CompletableFuture, multiple tasks can run concurrently.
+            versionsStage.thenRunAsync(() -> {
                 JVersionDetails versionDetails = VERSION_DETAILS_CACHE
                         .computeIfAbsent(version, RemoteHandler::downloadDetails);
 
@@ -98,31 +91,20 @@ class RemoteHandler {
                 }
 
                 TXLoaderCore.LOGGER.debug("Successfully fetched {}", asset.resourceLocation);
-            });
+            }, TXLoaderCore.EXECUTOR);
+
             return;
         }
 
         // asset from client/server jar:
-        if (!JarHandler.initialized) {
-            // wait for JARs to be indexed
-            TXLoaderCore.EXECUTOR_SINGLE.execute(() -> {
-                while (!JarHandler.initialized) {
-                    try {
-                        Thread.sleep(100);
-                    } catch (InterruptedException e) {}
-                }
-            });
-        }
 
-        TXLoaderCore.EXECUTOR_SINGLE.execute(() -> {
+        // By always re-assigning the CompletableFuture, only one JAR will be fetched at a time. We want this because it
+        // avoids downloading the same jar multiple times.
+        JarHandler.cacheStage = versionsStage.thenRunAsync(() -> {
             Path jarPath = source == Source.CLIENT ? JarHandler.CACHED_CLIENT_JARS.get(version)
                     : JarHandler.CACHED_SERVER_JARS.get(version);
 
             if (jarPath == null) {
-                if (waitAndTestAvailability()) {
-                    return;
-                }
-
                 JVersionDetails versionDetails = VERSION_DETAILS_CACHE
                         .computeIfAbsent(version, RemoteHandler::downloadDetails);
 
@@ -161,16 +143,7 @@ class RemoteHandler {
             }
 
             TXLoaderCore.LOGGER.debug("Successfully fetched {}", asset.resourceLocation);
-        });
-    }
-
-    private static boolean waitAndTestAvailability() {
-        while (state == State.STARTING) {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {}
-        }
-        return state == State.UNAVAILABLE;
+        }, TXLoaderCore.EXECUTOR);
     }
 
     private static JVersionManifest downloadManifest() throws JsonSyntaxException, IOException {
