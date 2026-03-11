@@ -13,11 +13,12 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.jar.JarFile;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import org.apache.commons.io.IOUtils;
@@ -29,7 +30,7 @@ import glowredman.txloader.Asset.Source;
 class RemoteHandler {
 
     static volatile @Nullable String latestRelease;
-    static @Nullable CompletionStage<Void> versionsStage;
+    static @Nullable CompletableFuture<Void> versionsStage;
     static final Map<String, JVersion> VERSIONS = Collections.synchronizedMap(new LinkedHashMap<>());
     private static final Map<JVersionDetails, Map<String, JAsset>> ASSETS = new ConcurrentHashMap<>();
     private static final Map<String, JVersionDetails> VERSION_DETAILS_CACHE = new ConcurrentHashMap<>();
@@ -53,10 +54,11 @@ class RemoteHandler {
         TXLoaderCore.LOGGER.info("Successfully fetched Minecraft versions.");
     }
 
-    static void fetchAsset(Asset asset) {
+    @Nonnull
+    static CompletableFuture<Void> fetchAsset(@Nonnull Asset asset) {
         Path path = asset.getPath();
         if (versionsStage == null || Files.exists(path)) {
-            return;
+            return CompletableFuture.completedFuture(null);
         }
 
         String version = asset.getVersion();
@@ -64,7 +66,7 @@ class RemoteHandler {
 
         if (source == Source.ASSET) {
             // By always calling thenRunAsync() on the original CompletableFuture, multiple tasks can run concurrently.
-            versionsStage.thenRunAsync(() -> {
+            return versionsStage.thenRunAsync(() -> {
                 JVersionDetails versionDetails = VERSION_DETAILS_CACHE
                         .computeIfAbsent(version, RemoteHandler::downloadDetails);
 
@@ -92,8 +94,6 @@ class RemoteHandler {
 
                 TXLoaderCore.LOGGER.debug("Successfully fetched {}", asset.resourceLocation);
             }, TXLoaderCore.EXECUTOR);
-
-            return;
         }
 
         // asset from client/server jar:
@@ -144,6 +144,8 @@ class RemoteHandler {
 
             TXLoaderCore.LOGGER.debug("Successfully fetched {}", asset.resourceLocation);
         }, TXLoaderCore.EXECUTOR);
+
+        return JarHandler.cacheStage;
     }
 
     private static JVersionManifest downloadManifest() throws JsonSyntaxException, IOException {

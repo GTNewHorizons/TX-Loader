@@ -1,5 +1,9 @@
 package glowredman.txloader;
 
+import java.util.concurrent.CompletableFuture;
+
+import javax.annotation.Nonnull;
+
 import glowredman.txloader.Asset.Source;
 
 public class AssetBuilder {
@@ -59,11 +63,31 @@ public class AssetBuilder {
     }
 
     /**
-     * Adds this {@link Asset} to the list of remote assets to load.
+     * Queues this {@link Asset} to be fetched as soon as possible (if it doesn't already exist).
      * 
+     * @deprecated Use {@link #fetch()} instead.
      * @author glowredman
      */
+    @Deprecated
     public void add() {
-        RemoteHandler.fetchAsset(this.asset);
+        this.fetch();
+    }
+
+    /**
+     * Queues this {@link Asset} to be fetched as soon as possible (if it doesn't already exist).
+     * <p>
+     * <b>Note:</b> The asset may not be available when it's needed. This depends on various factors, for example when
+     * this method is called, how many {@link Asset}s are queued or how fast the player's Internet connection is. Mods
+     * are expected to use the returned {@link CompletableFuture} to {@link CompletableFuture#join() block} the (main)
+     * thread before using the asset. To reduce the time the (main) thread is blocked, call {@link #fetch()} as soon as
+     * possible.
+     * 
+     * @return A {@link CompletableFuture} which can be used to block the (main) thread.
+     * @since 1.9.0
+     * @author glowredman
+     */
+    @Nonnull
+    public CompletableFuture<Void> fetch() {
+        return RemoteHandler.fetchAsset(this.asset);
     }
 }

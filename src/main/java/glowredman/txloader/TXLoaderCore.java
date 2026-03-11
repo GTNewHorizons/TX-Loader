@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -30,13 +31,16 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
 
     static final Logger LOGGER = LogManager.getLogger("TX Loader");
     static final ThreadLocal<Gson> GSON = ThreadLocal.withInitial(() -> new GsonBuilder().setPrettyPrinting().create());
-    // static final Executor EXECUTOR_SINGLE = Executors.newSingleThreadExecutor();
     static final Executor EXECUTOR = Executors.newCachedThreadPool();
     static File modFile;
     static Path mcLocation;
     static Path configDir;
     static Path resourcesDir;
     static Path forceResourcesDir;
+
+    static {
+        ((ThreadPoolExecutor) EXECUTOR).allowCoreThreadTimeOut(true);
+    }
 
     @Override
     public String[] getASMTransformerClass() {

@@ -15,6 +15,7 @@ import com.google.common.reflect.TypeToken;
 class ConfigHandler {
 
     private static Path configFile;
+    // loaded from the config, Assets created via AssetBuilder are not stored
     static final List<Asset> ASSETS = new ArrayList<>();
     private static final Type TYPE = new TypeToken<List<Asset>>() {
 

@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -30,7 +30,7 @@ class JarHandler {
     static final Map<String, Path> CACHED_CLIENT_JARS = new ConcurrentHashMap<>();
     static final Map<String, Path> CACHED_SERVER_JARS = new ConcurrentHashMap<>();
 
-    static @Nullable CompletionStage<Void> cacheStage;
+    static @Nullable CompletableFuture<Void> cacheStage;
     static @Nullable Path txloaderCache;
 
     static void indexJars() {
@@ -109,6 +109,10 @@ class JarHandler {
     }
 
     private static void collect(Path start, String fileName, Side side) {
+        if (!Files.isDirectory(start)) {
+            return;
+        }
+
         try {
             Files.walkFileTree(start, EnumSet.of(FileVisitOption.FOLLOW_LINKS), 2, new SimpleFileVisitor<Path>() {
 
