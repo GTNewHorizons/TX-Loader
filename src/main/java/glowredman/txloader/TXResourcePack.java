@@ -34,7 +34,7 @@ public class TXResourcePack implements IResourcePack {
     @Override
     public boolean resourceExists(ResourceLocation rl) {
         try {
-            return Files.exists(this.getResourcePath(rl));
+            return getResourcePath(rl).toFile().exists();
         } catch (InvalidPathException e) {
             /*
              * Some mods load resources dynamically by id. (example: java.nio.file.InvalidPathException: Illegal char
