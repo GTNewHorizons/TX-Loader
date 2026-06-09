@@ -27,8 +27,8 @@ import cpw.mods.fml.relauncher.Side;
 
 class JarHandler {
 
-    static final Map<String, Path> CACHED_CLIENT_JARS = new ConcurrentHashMap<>();
-    static final Map<String, Path> CACHED_SERVER_JARS = new ConcurrentHashMap<>();
+    static final Map<String, CompletableFuture<Path>> CACHED_CLIENT_JARS = new ConcurrentHashMap<>();
+    static final Map<String, CompletableFuture<Path>> CACHED_SERVER_JARS = new ConcurrentHashMap<>();
 
     static @Nullable CompletableFuture<Void> cacheStage;
     static @Nullable Path txloaderCache;
@@ -138,9 +138,9 @@ class JarHandler {
                     }
 
                     if (side.isClient()) {
-                        CACHED_CLIENT_JARS.put(version, file);
+                        CACHED_CLIENT_JARS.put(version, CompletableFuture.completedFuture(file));
                     } else {
-                        CACHED_SERVER_JARS.put(version, file);
+                        CACHED_SERVER_JARS.put(version, CompletableFuture.completedFuture(file));
                     }
                     TXLoaderCore.LOGGER.debug("Found {} jar for version {} at {}", side, version, file);
                     return FileVisitResult.SKIP_SIBLINGS;

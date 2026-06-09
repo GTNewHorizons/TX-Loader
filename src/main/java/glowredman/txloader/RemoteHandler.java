@@ -34,6 +34,7 @@ class RemoteHandler {
     static final Map<String, JVersion> VERSIONS = Collections.synchronizedMap(new LinkedHashMap<>());
     private static final Map<JVersionDetails, Map<String, JAsset>> ASSETS = new ConcurrentHashMap<>();
     private static final Map<String, JVersionDetails> VERSION_DETAILS_CACHE = new ConcurrentHashMap<>();
+    private static final Object LOCK = new Object();
 
     static void fetchVersions() {
         JVersionManifest manifest;
@@ -70,15 +71,13 @@ class RemoteHandler {
         }
 
         // asset from client/server jar:
-        synchronized (JarHandler.cacheStage) {
+        synchronized (LOCK) {
             // By always re-assigning the CompletableFuture, only one JAR will be fetched at a time. We want this
-            // because it
-            // avoids downloading the same jar multiple times.
-            JarHandler.cacheStage = JarHandler.cacheStage
-                    .thenRunAsync(() -> fetchFromJar(asset, path, version, source), TXLoaderCore.EXECUTOR);
+            // because it avoids downloading the same jar multiple times.
+            return (source == Source.CLIENT ? JarHandler.CACHED_CLIENT_JARS : JarHandler.CACHED_SERVER_JARS)
+                    .computeIfAbsent(version, v -> downloadJar(asset, v, source))
+                    .thenAcceptAsync(jarPath -> fetchFromJar(asset, jarPath, path), TXLoaderCore.EXECUTOR);
         }
-
-        return JarHandler.cacheStage;
     }
 
     private static void fetchDirect(Asset asset, Path path, String version) {
@@ -107,43 +106,43 @@ class RemoteHandler {
         TXLoaderCore.LOGGER.debug("Successfully fetched {}", asset.resourceLocation);
     }
 
-    private static void fetchFromJar(Asset asset, Path path, String version, Source source) {
-        Path jarPath = source == Source.CLIENT ? JarHandler.CACHED_CLIENT_JARS.get(version)
-                : JarHandler.CACHED_SERVER_JARS.get(version);
-
-        if (jarPath == null) {
+    private static CompletableFuture<Path> downloadJar(Asset asset, String version, Source source) {
+        return JarHandler.cacheStage.thenApplyAsync(v -> {
             JVersionDetails versionDetails = VERSION_DETAILS_CACHE
                     .computeIfAbsent(version, RemoteHandler::downloadDetails);
 
             if (versionDetails == null) {
                 TXLoaderCore.LOGGER
                         .error("Failed to get details for version {}! Path: {}", version, asset.resourceLocation);
-                return;
+                return null;
             }
 
             if (source == Source.CLIENT) {
                 try {
-                    jarPath = versionDetails.downloads.client.downloadJar(version, "client.jar");
-                    JarHandler.CACHED_CLIENT_JARS.put(version, jarPath);
+                    return versionDetails.downloads.client.downloadJar(version, "client.jar");
                 } catch (Exception e) {
                     TXLoaderCore.LOGGER.error("Failed to download client jar and no cached jar was found", e);
-                    return;
-                }
-            } else {
-                try {
-                    jarPath = versionDetails.downloads.server.downloadJar(version, "server.jar");
-                    JarHandler.CACHED_SERVER_JARS.put(version, jarPath);
-                } catch (Exception e) {
-                    TXLoaderCore.LOGGER.error("Failed to download server jar and no cached jar was found", e);
-                    return;
+                    return null;
                 }
             }
+            try {
+                return versionDetails.downloads.server.downloadJar(version, "server.jar");
+            } catch (Exception e) {
+                TXLoaderCore.LOGGER.error("Failed to download server jar and no cached jar was found", e);
+                return null;
+            }
+        }, TXLoaderCore.EXECUTOR);
+    }
+
+    private static void fetchFromJar(Asset asset, Path jarPath, Path targetPath) {
+        if (jarPath == null) {
+            return;
         }
 
         try (JarFile jarFile = new JarFile(jarPath.toFile());
                 InputStream is = jarFile.getInputStream(jarFile.getJarEntry("assets/" + asset.resourceLocation))) {
-            Files.createDirectories(path.getParent());
-            Files.copy(is, path);
+            Files.createDirectories(targetPath.getParent());
+            Files.copy(is, targetPath);
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed to extract asset from jar! Path: {}", asset.resourceLocation, e);
             return;
