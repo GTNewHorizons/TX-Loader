@@ -9,6 +9,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -39,7 +40,7 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
     static Path forceResourcesDir;
 
     static {
-        ((ThreadPoolExecutor) EXECUTOR).allowCoreThreadTimeOut(true);
+        ((ThreadPoolExecutor) EXECUTOR).setKeepAliveTime(10, TimeUnit.SECONDS);
     }
 
     @Override
