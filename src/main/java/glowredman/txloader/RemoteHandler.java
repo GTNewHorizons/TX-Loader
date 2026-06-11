@@ -13,9 +13,11 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.jar.JarFile;
 
 import javax.annotation.Nonnull;
@@ -33,8 +35,7 @@ class RemoteHandler {
     static @Nullable CompletableFuture<Void> versionsStage;
     static final Map<String, JVersion> VERSIONS = Collections.synchronizedMap(new LinkedHashMap<>());
     private static final Map<JVersionDetails, Map<String, JAsset>> ASSETS = new ConcurrentHashMap<>();
-    private static final Map<String, JVersionDetails> VERSION_DETAILS_CACHE = new ConcurrentHashMap<>();
-    private static final Object LOCK = new Object();
+    private static final Map<String, CompletableFuture<JVersionDetails>> VERSION_DETAILS_CACHE = new ConcurrentHashMap<>();
 
     static void fetchVersions() {
         JVersionManifest manifest;
@@ -71,15 +72,13 @@ class RemoteHandler {
         }
 
         // asset from client/server jar:
-        // Note: only one JAR will be fetched at a time. We want this because it avoids downloading the same jar
-        // multiple times.
         return (source == Source.CLIENT ? JarHandler.CACHED_CLIENT_JARS : JarHandler.CACHED_SERVER_JARS)
                 .computeIfAbsent(version, v -> downloadJar(asset, v, source))
                 .thenAcceptAsync(jarPath -> fetchFromJar(asset, jarPath, path), TXLoaderCore.EXECUTOR);
     }
 
     private static void fetchDirect(Asset asset, Path path, String version) {
-        JVersionDetails versionDetails = VERSION_DETAILS_CACHE.computeIfAbsent(version, RemoteHandler::downloadDetails);
+        JVersionDetails versionDetails = getDetails(version);
 
         if (versionDetails == null) {
             TXLoaderCore.LOGGER
@@ -105,9 +104,8 @@ class RemoteHandler {
     }
 
     private static CompletableFuture<Path> downloadJar(Asset asset, String version, Source source) {
-        return JarHandler.cacheStage.thenApplyAsync(v -> {
-            JVersionDetails versionDetails = VERSION_DETAILS_CACHE
-                    .computeIfAbsent(version, RemoteHandler::downloadDetails);
+        return JarHandler.cacheStage.thenApplyAsync(void_ -> {
+            JVersionDetails versionDetails = getDetails(version);
 
             if (versionDetails == null) {
                 TXLoaderCore.LOGGER
@@ -153,6 +151,28 @@ class RemoteHandler {
         final URL manifestURL = new URL("https://launchermeta.mojang.com/mc/game/version_manifest.json");
         return TXLoaderCore.GSON.get()
                 .fromJson(IOUtils.toString(manifestURL, StandardCharsets.UTF_8), JVersionManifest.class);
+    }
+
+    private static JVersionDetails getDetails(String version) {
+        try {
+            return VERSION_DETAILS_CACHE
+                    .computeIfAbsent(
+                            version,
+                            ver -> versionsStage.thenApplyAsync(void_ -> downloadDetails(ver), TXLoaderCore.EXECUTOR))
+                    .get();
+        } catch (CancellationException e) {
+            TXLoaderCore.LOGGER
+                    .error("The Future for downloading the version details for {} was cancelled!", version, e);
+        } catch (ExecutionException e) {
+            TXLoaderCore.LOGGER.error(
+                    "The Future for downloading the version details for {} failed during execution!",
+                    version,
+                    e);
+        } catch (InterruptedException e) {
+            TXLoaderCore.LOGGER
+                    .error("The Future for downloading the version details for {} was interrupted!", version, e);
+        }
+        return null;
     }
 
     private static JVersionDetails downloadDetails(String version) {
