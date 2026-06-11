@@ -71,13 +71,11 @@ class RemoteHandler {
         }
 
         // asset from client/server jar:
-        synchronized (LOCK) {
-            // By always re-assigning the CompletableFuture, only one JAR will be fetched at a time. We want this
-            // because it avoids downloading the same jar multiple times.
-            return (source == Source.CLIENT ? JarHandler.CACHED_CLIENT_JARS : JarHandler.CACHED_SERVER_JARS)
-                    .computeIfAbsent(version, v -> downloadJar(asset, v, source))
-                    .thenAcceptAsync(jarPath -> fetchFromJar(asset, jarPath, path), TXLoaderCore.EXECUTOR);
-        }
+        // Note: only one JAR will be fetched at a time. We want this because it avoids downloading the same jar
+        // multiple times.
+        return (source == Source.CLIENT ? JarHandler.CACHED_CLIENT_JARS : JarHandler.CACHED_SERVER_JARS)
+                .computeIfAbsent(version, v -> downloadJar(asset, v, source))
+                .thenAcceptAsync(jarPath -> fetchFromJar(asset, jarPath, path), TXLoaderCore.EXECUTOR);
     }
 
     private static void fetchDirect(Asset asset, Path path, String version) {
