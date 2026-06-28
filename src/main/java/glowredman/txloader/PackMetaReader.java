@@ -1,6 +1,5 @@
 package glowredman.txloader;
 
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
@@ -22,16 +21,16 @@ class PackMetaReader {
             if (Files.isDirectory(pack)) {
                 Path meta = pack.resolve(META);
                 if (!Files.isRegularFile(meta)) return Optional.empty();
-                try (InputStream in = Files.newInputStream(meta)) {
-                    return parse(in);
+                try (Reader r = new InputStreamReader(Files.newInputStream(meta), StandardCharsets.UTF_8)) {
+                    return parse(r);
                 }
             }
             if (pack.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".zip")) {
                 try (ZipFile zip = new ZipFile(pack.toFile())) {
                     ZipEntry entry = zip.getEntry(META);
                     if (entry == null) return Optional.empty();
-                    try (InputStream in = zip.getInputStream(entry)) {
-                        return parse(in);
+                    try (Reader r = new InputStreamReader(zip.getInputStream(entry), StandardCharsets.UTF_8)) {
+                        return parse(r);
                     }
                 }
             }
@@ -42,8 +41,8 @@ class PackMetaReader {
         }
     }
 
-    private static Optional<ForceLoadMeta> parse(InputStream in) {
-        try (Reader r = new InputStreamReader(in, StandardCharsets.UTF_8)) {
+    private static Optional<ForceLoadMeta> parse(Reader r) {
+        try {
             JsonObject root = TXLoaderCore.GSON.fromJson(r, JsonObject.class);
             if (root == null || !root.has("txloader") || !root.get("txloader").isJsonObject()) {
                 return Optional.empty();

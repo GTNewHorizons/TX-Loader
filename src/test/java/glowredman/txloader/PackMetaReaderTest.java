@@ -68,4 +68,23 @@ class PackMetaReaderTest {
 
         assertFalse(PackMetaReader.read(pack).isPresent());
     }
+
+    @Test
+    void emptyWhenZipHasNoMcmeta(@TempDir Path tmp) throws IOException {
+        Path zip = tmp.resolve("Empty.zip");
+        try (ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(zip))) {
+            out.putNextEntry(new ZipEntry("other.txt"));
+            out.write("x".getBytes(StandardCharsets.UTF_8));
+            out.closeEntry();
+        }
+        assertFalse(PackMetaReader.read(zip).isPresent());
+    }
+
+    @Test
+    void priorityFromStringIsCaseInsensitiveAndDefaultsBottom() {
+        assertEquals(ForceLoadMeta.Priority.TOP, ForceLoadMeta.Priority.fromString("top"));
+        assertEquals(ForceLoadMeta.Priority.TOP, ForceLoadMeta.Priority.fromString("TOP"));
+        assertEquals(ForceLoadMeta.Priority.BOTTOM, ForceLoadMeta.Priority.fromString(null));
+        assertEquals(ForceLoadMeta.Priority.BOTTOM, ForceLoadMeta.Priority.fromString("other"));
+    }
 }
