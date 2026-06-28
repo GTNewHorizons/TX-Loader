@@ -1,3 +1,6 @@
 dependencies {
     compileOnly("com.github.GTNewHorizons:BetterLoadingScreen:1.7.6-GTNH:dev") { transitive = false }
+
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.10.2")
 }

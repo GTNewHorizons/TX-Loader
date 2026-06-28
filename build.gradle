@@ -3,3 +3,8 @@
 plugins {
     id 'com.gtnewhorizons.gtnhconvention'
 }
+
+// GTNHGradle does not call useJUnitPlatform(); required for JUnit 5 test discovery
+tasks.named('test', Test) {
+    useJUnitPlatform()
+}
