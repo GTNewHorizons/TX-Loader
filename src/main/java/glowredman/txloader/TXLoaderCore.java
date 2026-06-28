@@ -83,6 +83,7 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
         JarHandler.indexJars();
         ConfigHandler.load();
         ConfigHandler.moveRLAssets();
+        ForceLoadHandler.run(mcLocation, configDir);
     }
 
     @Override
