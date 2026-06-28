@@ -15,8 +15,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 class PackMetaReaderTest {
 
-    private static final String FORCE_TOP =
-            "{\"pack\":{\"pack_format\":1},\"txloader\":{\"forceLoad\":true,\"priority\":\"top\"}}";
+    private static final String FORCE_TOP = "{\"pack\":{\"pack_format\":1},\"txloader\":{\"forceLoad\":true,\"priority\":\"top\"}}";
 
     @Test
     void readsFolderPack(@TempDir Path tmp) throws IOException {

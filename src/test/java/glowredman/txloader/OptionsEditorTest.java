@@ -15,16 +15,16 @@ import org.junit.jupiter.api.io.TempDir;
 class OptionsEditorTest {
 
     private String packsLine(Path options) throws IOException {
-        return Files.readAllLines(options, StandardCharsets.UTF_8).stream()
-                .filter(l -> l.startsWith("resourcePacks:"))
+        return Files.readAllLines(options, StandardCharsets.UTF_8).stream().filter(l -> l.startsWith("resourcePacks:"))
                 .findFirst().orElse(null);
     }
 
     @Test
     void appendsTopToEnd(@TempDir Path tmp) throws IOException {
         Path options = tmp.resolve("options.txt");
-        Files.write(options, ("fov:1.0\nresourcePacks:[\"existing.zip\"]\nmipmapLevels:4\n")
-                .getBytes(StandardCharsets.UTF_8));
+        Files.write(
+                options,
+                ("fov:1.0\nresourcePacks:[\"existing.zip\"]\nmipmapLevels:4\n").getBytes(StandardCharsets.UTF_8));
 
         OptionsEditor.enable(options, Collections.singletonList("forced.zip"), ForceLoadMeta.Priority.TOP);
 

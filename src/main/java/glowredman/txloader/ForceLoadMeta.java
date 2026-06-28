@@ -3,6 +3,7 @@ package glowredman.txloader;
 class ForceLoadMeta {
 
     enum Priority {
+
         TOP,
         BOTTOM;
 
