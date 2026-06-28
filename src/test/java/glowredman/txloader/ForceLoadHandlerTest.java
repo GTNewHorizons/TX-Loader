@@ -54,4 +54,25 @@ class ForceLoadHandlerTest {
         Path config = tmp.resolve("config");
         assertDoesNotThrow(() -> ForceLoadHandler.run(mc, config));
     }
+
+    @Test
+    void failedWriteIsNotRecordedAndRetries(@TempDir Path tmp) throws IOException {
+        Path mc = Files.createDirectories(tmp.resolve("mc"));
+        Path config = Files.createDirectories(tmp.resolve("config"));
+        Path packs = Files.createDirectories(mc.resolve("resourcepacks"));
+        makeFolderPack(packs, "ForcedPack", "{\"txloader\":{\"forceLoad\":true,\"priority\":\"top\"}}");
+
+        // Create options.txt as a directory so the write fails
+        Files.createDirectories(mc.resolve("options.txt"));
+
+        ForceLoadHandler.run(mc, config);
+
+        // The pack should NOT be recorded because the write failed
+        Path forceloaded = config.resolve("forceloaded.json");
+        if (Files.exists(forceloaded) && Files.isRegularFile(forceloaded)) {
+            ForceLoadState state = ForceLoadState.load(forceloaded);
+            assertFalse(state.contains("ForcedPack"), "Pack should not be recorded after a failed write");
+        }
+        // If forceloaded.json does not exist at all, that also satisfies the assertion
+    }
 }

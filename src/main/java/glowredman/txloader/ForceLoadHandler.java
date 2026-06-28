@@ -33,7 +33,6 @@ class ForceLoadHandler {
                     } else {
                         bottom.add(name);
                     }
-                    state.record(name, now);
                     TXLoaderCore.LOGGER.info("Force-loading resource pack {} ({})", name, meta.get().priority());
                 }
             }
@@ -41,9 +40,16 @@ class ForceLoadHandler {
             if (top.isEmpty() && bottom.isEmpty()) return;
 
             Path options = mcLocation.resolve("options.txt");
-            OptionsEditor.enable(options, bottom, ForceLoadMeta.Priority.BOTTOM);
-            OptionsEditor.enable(options, top, ForceLoadMeta.Priority.TOP);
-            state.save();
+            boolean recorded = false;
+            if (OptionsEditor.enable(options, bottom, ForceLoadMeta.Priority.BOTTOM) && !bottom.isEmpty()) {
+                for (String name : bottom) state.record(name, now);
+                recorded = true;
+            }
+            if (OptionsEditor.enable(options, top, ForceLoadMeta.Priority.TOP) && !top.isEmpty()) {
+                for (String name : top) state.record(name, now);
+                recorded = true;
+            }
+            if (recorded) state.save();
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Force-load handling failed", e);
         }

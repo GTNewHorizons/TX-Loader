@@ -83,4 +83,25 @@ class OptionsEditorTest {
 
         assertEquals("resourcePacks:[\"existing.zip\"]", packsLine(options));
     }
+
+    @Test
+    void multipleBottomNamesPreserveInputOrder(@TempDir Path tmp) throws IOException {
+        Path options = tmp.resolve("options.txt");
+        Files.write(options, "resourcePacks:[\"c\"]\n".getBytes(StandardCharsets.UTF_8));
+
+        OptionsEditor.enable(options, Arrays.asList("a", "b"), ForceLoadMeta.Priority.BOTTOM);
+
+        assertEquals("resourcePacks:[\"a\",\"b\",\"c\"]", packsLine(options));
+    }
+
+    @Test
+    void enableReturnsFalseWhenWriteFails(@TempDir Path tmp) throws IOException {
+        // Create options as a directory so Files.write throws
+        Path optionsDir = tmp.resolve("options.txt");
+        Files.createDirectories(optionsDir);
+
+        boolean result = OptionsEditor.enable(optionsDir, Collections.singletonList("x"), ForceLoadMeta.Priority.TOP);
+
+        assertFalse(result);
+    }
 }
