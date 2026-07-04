@@ -31,7 +31,7 @@ import cpw.mods.fml.relauncher.IFMLLoadingPlugin.TransformerExclusions;
 public class TXLoaderCore implements IFMLLoadingPlugin {
 
     static final Logger LOGGER = LogManager.getLogger("TX Loader");
-    static final ThreadLocal<Gson> GSON = ThreadLocal.withInitial(() -> new GsonBuilder().setPrettyPrinting().create());
+    static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     static final Executor EXECUTOR = Executors.newCachedThreadPool();
     static File modFile;
     static Path mcLocation;

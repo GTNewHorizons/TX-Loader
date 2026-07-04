@@ -149,7 +149,7 @@ class RemoteHandler {
 
     private static JVersionManifest downloadManifest() throws JsonSyntaxException, IOException {
         final URL manifestURL = new URL("https://launchermeta.mojang.com/mc/game/version_manifest.json");
-        return TXLoaderCore.GSON.get()
+        return TXLoaderCore.GSON
                 .fromJson(IOUtils.toString(manifestURL, StandardCharsets.UTF_8), JVersionManifest.class);
     }
 
@@ -181,7 +181,7 @@ class RemoteHandler {
             synchronized (VERSIONS) {
                 versionURL = new URL(VERSIONS.get(version).url);
             }
-            return TXLoaderCore.GSON.get()
+            return TXLoaderCore.GSON
                     .fromJson(IOUtils.toString(versionURL, StandardCharsets.UTF_8), JVersionDetails.class);
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed to get version details", e);
@@ -222,7 +222,7 @@ class RemoteHandler {
         Map<String, JAsset> getAssets() {
             try {
                 final URL assetsURL = new URL(this.assetIndex.url);
-                return TXLoaderCore.GSON.get()
+                return TXLoaderCore.GSON
                         .fromJson(IOUtils.toString(assetsURL, StandardCharsets.UTF_8), JAssetIndex.class).objects;
             } catch (Exception e) {
                 TXLoaderCore.LOGGER.error("Failed to get asset index", e);

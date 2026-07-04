@@ -27,9 +27,7 @@ class ConfigHandler {
 
         if (Files.notExists(configFile)) {
             try {
-                Files.write(
-                        configFile,
-                        TXLoaderCore.GSON.get().toJson(new ArrayList<>()).getBytes(StandardCharsets.UTF_8));
+                Files.write(configFile, TXLoaderCore.GSON.toJson(new ArrayList<>()).getBytes(StandardCharsets.UTF_8));
             } catch (Exception e) {
                 TXLoaderCore.LOGGER.error("Failed to create config file!", e);
             }
@@ -37,7 +35,7 @@ class ConfigHandler {
         }
 
         try (BufferedReader reader = Files.newBufferedReader(configFile, StandardCharsets.UTF_8)) {
-            ASSETS.addAll(TXLoaderCore.GSON.get().fromJson(reader, TYPE));
+            ASSETS.addAll(TXLoaderCore.GSON.fromJson(reader, TYPE));
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed to read config file!", e);
             return;
@@ -50,7 +48,7 @@ class ConfigHandler {
 
     static boolean save() {
         try {
-            Files.write(configFile, TXLoaderCore.GSON.get().toJson(ASSETS, TYPE).getBytes(StandardCharsets.UTF_8));
+            Files.write(configFile, TXLoaderCore.GSON.toJson(ASSETS, TYPE).getBytes(StandardCharsets.UTF_8));
             return true;
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed saving config!", e);
