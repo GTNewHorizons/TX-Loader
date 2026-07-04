@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Stream;
@@ -16,7 +17,7 @@ class ConfigHandler {
 
     private static Path configFile;
     // loaded from the config, Assets created via AssetBuilder are not stored
-    static final List<Asset> ASSETS = new ArrayList<>();
+    static final List<Asset> ASSETS = Collections.synchronizedList(new ArrayList<>());
     private static final Type TYPE = new TypeToken<List<Asset>>() {
 
         private static final long serialVersionUID = 1L;
@@ -35,7 +36,9 @@ class ConfigHandler {
         }
 
         try (BufferedReader reader = Files.newBufferedReader(configFile, StandardCharsets.UTF_8)) {
-            ASSETS.addAll(TXLoaderCore.GSON.fromJson(reader, TYPE));
+            synchronized (ASSETS) {
+                ASSETS.addAll(TXLoaderCore.GSON.fromJson(reader, TYPE));
+            }
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed to read config file!", e);
             return;
@@ -43,12 +46,16 @@ class ConfigHandler {
 
         TXLoaderCore.LOGGER.info("Successfully read config file.");
 
-        ASSETS.forEach(RemoteHandler::fetchAsset);
+        synchronized (ASSETS) {
+            ASSETS.forEach(RemoteHandler::fetchAsset);
+        }
     }
 
     static boolean save() {
         try {
-            Files.write(configFile, TXLoaderCore.GSON.toJson(ASSETS, TYPE).getBytes(StandardCharsets.UTF_8));
+            synchronized (ASSETS) {
+                Files.write(configFile, TXLoaderCore.GSON.toJson(ASSETS, TYPE).getBytes(StandardCharsets.UTF_8));
+            }
             return true;
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed saving config!", e);
