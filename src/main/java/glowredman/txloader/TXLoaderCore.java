@@ -7,7 +7,7 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -32,16 +32,13 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
 
     static final Logger LOGGER = LogManager.getLogger("TX Loader");
     static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    static final Executor EXECUTOR = Executors.newCachedThreadPool();
+    static final Executor EXECUTOR_IO = new ThreadPoolExecutor(0, 512, 10, TimeUnit.SECONDS, new SynchronousQueue<>());
+    static final Executor EXECUTOR_NET = new ThreadPoolExecutor(0, 32, 10, TimeUnit.SECONDS, new SynchronousQueue<>());
     static File modFile;
     static Path mcLocation;
     static Path configDir;
     static Path resourcesDir;
     static Path forceResourcesDir;
-
-    static {
-        ((ThreadPoolExecutor) EXECUTOR).setKeepAliveTime(10, TimeUnit.SECONDS);
-    }
 
     @Override
     public String[] getASMTransformerClass() {
@@ -77,10 +74,10 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
             return;
         }
 
-        RemoteHandler.versionsStage = CompletableFuture.runAsync(RemoteHandler::fetchVersions, EXECUTOR);
-        JarHandler.cacheStage = RemoteHandler.versionsStage.thenRunAsync(JarHandler::indexJars, EXECUTOR)
-                .thenRunAsync(ConfigHandler::moveRLAssets, EXECUTOR);
-        JarHandler.cacheStage.thenRunAsync(ConfigHandler::load, EXECUTOR);
+        RemoteHandler.versionsStage = CompletableFuture.runAsync(RemoteHandler::fetchVersions, EXECUTOR_NET);
+        JarHandler.cacheStage = RemoteHandler.versionsStage.thenRunAsync(JarHandler::indexJars, EXECUTOR_IO)
+                .thenRunAsync(ConfigHandler::moveRLAssets, EXECUTOR_IO);
+        JarHandler.cacheStage.thenRunAsync(ConfigHandler::load, EXECUTOR_IO);
     }
 
     @Override

@@ -68,13 +68,13 @@ class RemoteHandler {
 
         if (source == Source.ASSET) {
             // By always calling thenRunAsync() on the original CompletableFuture, multiple tasks can run concurrently.
-            return versionsStage.thenRunAsync(() -> fetchDirect(asset, path, version), TXLoaderCore.EXECUTOR);
+            return versionsStage.thenRunAsync(() -> fetchDirect(asset, path, version), TXLoaderCore.EXECUTOR_NET);
         }
 
         // asset from client/server jar:
         return (source == Source.CLIENT ? JarHandler.CACHED_CLIENT_JARS : JarHandler.CACHED_SERVER_JARS)
                 .computeIfAbsent(version, v -> downloadJar(asset, v, source))
-                .thenAcceptAsync(jarPath -> fetchFromJar(asset, jarPath, path), TXLoaderCore.EXECUTOR);
+                .thenAcceptAsync(jarPath -> fetchFromJar(asset, jarPath, path), TXLoaderCore.EXECUTOR_IO);
     }
 
     private static void fetchDirect(Asset asset, Path path, String version) {
@@ -127,7 +127,7 @@ class RemoteHandler {
                 TXLoaderCore.LOGGER.error("Failed to download server jar and no cached jar was found", e);
                 return null;
             }
-        }, TXLoaderCore.EXECUTOR);
+        }, TXLoaderCore.EXECUTOR_NET);
     }
 
     private static void fetchFromJar(Asset asset, Path jarPath, Path targetPath) {
@@ -155,10 +155,9 @@ class RemoteHandler {
 
     private static JVersionDetails getDetails(String version) {
         try {
-            return VERSION_DETAILS_CACHE
-                    .computeIfAbsent(
-                            version,
-                            ver -> versionsStage.thenApplyAsync(void_ -> downloadDetails(ver), TXLoaderCore.EXECUTOR))
+            return VERSION_DETAILS_CACHE.computeIfAbsent(
+                    version,
+                    ver -> versionsStage.thenApplyAsync(void_ -> downloadDetails(ver), TXLoaderCore.EXECUTOR_NET))
                     .get();
         } catch (CancellationException e) {
             TXLoaderCore.LOGGER
