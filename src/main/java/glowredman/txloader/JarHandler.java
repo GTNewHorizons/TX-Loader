@@ -9,11 +9,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
-import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -25,8 +25,8 @@ class JarHandler {
 
     static final Map<String, CompletableFuture<Path>> CACHED_CLIENT_JARS = new ConcurrentHashMap<>();
     static final Map<String, CompletableFuture<Path>> CACHED_SERVER_JARS = new ConcurrentHashMap<>();
-    private static final Set<Pair<Path, String>> CLIENT_LOCATIONS = Collections.synchronizedSet(new HashSet<>());
-    private static final Set<Pair<Path, String>> SERVER_LOCATIONS = Collections.synchronizedSet(new HashSet<>());
+    private static final List<Pair<Path, String>> CLIENT_LOCATIONS = Collections.synchronizedList(new ArrayList<>());
+    private static final List<Pair<Path, String>> SERVER_LOCATIONS = Collections.synchronizedList(new ArrayList<>());
 
     static @Nullable CompletableFuture<Void> cacheStage;
     static @Nullable Path txloaderCache;
@@ -111,57 +111,84 @@ class JarHandler {
         }
     }
 
-    static void index(boolean client) {
-        Set<Pair<Path, String>> locations = client ? CLIENT_LOCATIONS : SERVER_LOCATIONS;
+    static Path index(boolean client, String targetVersion) {
+        List<Pair<Path, String>> locations = client ? CLIENT_LOCATIONS : SERVER_LOCATIONS;
+        Path finalResult = null;
         synchronized (locations) {
             for (Pair<Path, String> location : locations) {
-                collect(location.getLeft(), location.getRight(), client);
+                Path result = collect(location.getLeft(), location.getRight(), client, targetVersion);
+                if (result != null) {
+                    finalResult = result;
+                }
             }
         }
+        return finalResult;
     }
 
-    private static void collect(Path start, String fileName, boolean client) {
+    private static Path collect(Path start, String fileName, boolean client, String targetVersion) {
         if (!Files.isDirectory(start)) {
-            return;
+            return null;
         }
 
+        FileVisitor visitor = new FileVisitor(start, fileName, client, targetVersion);
+
         try {
-            Files.walkFileTree(start, EnumSet.of(FileVisitOption.FOLLOW_LINKS), 2, new SimpleFileVisitor<Path>() {
-
-                @Override
-                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-                    if (!Files.isSameFile(dir, start)
-                            && !RemoteHandler.VERSIONS.containsKey(dir.getFileName().toString())) {
-                        return FileVisitResult.SKIP_SUBTREE;
-                    }
-                    return FileVisitResult.CONTINUE;
-                }
-
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                    Path parent = file.getParent();
-                    if (Files.isSameFile(parent, start) || !attrs.isRegularFile() || attrs.size() <= 1024) {
-                        return FileVisitResult.CONTINUE;
-                    }
-
-                    String version = parent.getFileName().toString();
-                    if (!String.format(fileName, version).equals(file.getFileName().toString())) {
-                        return FileVisitResult.CONTINUE;
-                    }
-
-                    if (client) {
-                        CACHED_CLIENT_JARS.put(version, CompletableFuture.completedFuture(file));
-                    } else {
-                        CACHED_SERVER_JARS.put(version, CompletableFuture.completedFuture(file));
-                    }
-                    TXLoaderCore.LOGGER
-                            .debug("Found {} jar for version {} at {}", client ? "CLIENT" : "SERVER", version, file);
-                    return FileVisitResult.SKIP_SIBLINGS;
-                }
-            });
+            Files.walkFileTree(start, EnumSet.of(FileVisitOption.FOLLOW_LINKS), 2, visitor);
         } catch (IOException e) {
             TXLoaderCore.LOGGER.debug("Cannot walk cache directory {}", start, e);
         }
+
+        return visitor.result;
     }
 
+    private static class FileVisitor extends SimpleFileVisitor<Path> {
+
+        private final Path start;
+        private final String fileName;
+        private final boolean client;
+        private final String targetVersion;
+        Path result;
+
+        public FileVisitor(Path start, String fileName, boolean client, String targetVersion) {
+            this.start = start;
+            this.fileName = fileName;
+            this.client = client;
+            this.targetVersion = targetVersion;
+        }
+
+        @Override
+        public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+            if (!Files.isSameFile(dir, this.start)
+                    && !RemoteHandler.VERSIONS.containsKey(dir.getFileName().toString())) {
+                return FileVisitResult.SKIP_SUBTREE;
+            }
+            return FileVisitResult.CONTINUE;
+        }
+
+        @Override
+        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+            Path parent = file.getParent();
+            if (Files.isSameFile(parent, this.start) || !attrs.isRegularFile() || attrs.size() <= 1024) {
+                return FileVisitResult.CONTINUE;
+            }
+
+            String version = parent.getFileName().toString();
+            if (!String.format(this.fileName, version).equals(file.getFileName().toString())) {
+                return FileVisitResult.CONTINUE;
+            }
+
+            if (version.equals(this.targetVersion)) {
+                this.result = file;
+            }
+
+            if (this.client) {
+                CACHED_CLIENT_JARS.put(version, CompletableFuture.completedFuture(file));
+            } else {
+                CACHED_SERVER_JARS.put(version, CompletableFuture.completedFuture(file));
+            }
+            TXLoaderCore.LOGGER
+                    .debug("Found {} jar for version {} at {}", this.client ? "CLIENT" : "SERVER", version, file);
+            return FileVisitResult.SKIP_SIBLINGS;
+        }
+    }
 }

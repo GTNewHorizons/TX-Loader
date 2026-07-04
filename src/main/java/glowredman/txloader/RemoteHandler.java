@@ -75,15 +75,6 @@ class RemoteHandler {
         }
 
         // asset from client/server jar:
-
-        // TODO: make async somehow
-        if (source == Source.CLIENT && JarHandler.CACHED_CLIENT_JARS.isEmpty()) {
-            JarHandler.index(true);
-        }
-        if (source == Source.SERVER && JarHandler.CACHED_SERVER_JARS.isEmpty()) {
-            JarHandler.index(false);
-        }
-
         return (source == Source.CLIENT ? JarHandler.CACHED_CLIENT_JARS : JarHandler.CACHED_SERVER_JARS)
                 .computeIfAbsent(version, v -> downloadJar(asset, v, source))
                 .thenAcceptAsync(jarPath -> fetchFromJar(asset, jarPath, path), TXLoaderCore.EXECUTOR_IO);
@@ -123,13 +114,19 @@ class RemoteHandler {
 
     private static CompletableFuture<Path> downloadJar(Asset asset, String version, Source source) {
         return JarHandler.cacheStage.thenCombineAsync(getDetails(version), (void_, versionDetails) -> {
+            boolean client = source == Source.CLIENT;
+            Path p = JarHandler.index(client, version);
+            if (p != null) {
+                return p;
+            }
+
             if (versionDetails == null) {
                 TXLoaderCore.LOGGER
                         .error("Failed to get details for version {}! Path: {}", version, asset.resourceLocation);
                 return null;
             }
 
-            if (source == Source.CLIENT) {
+            if (client) {
                 try {
                     return versionDetails.downloads.client.downloadJar(version, "client.jar");
                 } catch (Exception e) {
