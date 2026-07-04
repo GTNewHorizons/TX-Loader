@@ -9,31 +9,29 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 
 import javax.annotation.Nullable;
 
 import org.apache.commons.lang3.tuple.Pair;
 
-import com.google.common.base.Stopwatch;
-
-import cpw.mods.fml.relauncher.Side;
-
 class JarHandler {
 
     static final Map<String, CompletableFuture<Path>> CACHED_CLIENT_JARS = new ConcurrentHashMap<>();
     static final Map<String, CompletableFuture<Path>> CACHED_SERVER_JARS = new ConcurrentHashMap<>();
+    private static final Set<Pair<Path, String>> CLIENT_LOCATIONS = Collections.synchronizedSet(new HashSet<>());
+    private static final Set<Pair<Path, String>> SERVER_LOCATIONS = Collections.synchronizedSet(new HashSet<>());
 
     static @Nullable CompletableFuture<Void> cacheStage;
     static @Nullable Path txloaderCache;
 
-    static void indexJars() {
+    static void initCache() {
         String userHome = System.getProperty("user.home");
         String system = System.getProperty("os.name").toLowerCase();
         try {
@@ -71,44 +69,58 @@ class JarHandler {
 
         TXLoaderCore.LOGGER.debug("Cache location is {}", txloaderCache);
 
-        List<Pair<Path, String>> clientLocations = new ArrayList<>();
-        clientLocations.add(Pair.of(txloaderCache, "client.jar"));
-        clientLocations.add(Pair.of(Paths.get(userHome, "AppData", "Roaming", ".minecraft", "versions"), "%s.jar"));
-        clientLocations.add(
-                Pair.of(
-                        Paths.get(userHome, ".gradle", "caches", "forge_gradle", "minecraft_repo", "versions"),
-                        "client.jar"));
-        clientLocations.add(
-                Pair.of(
-                        Paths.get(userHome, ".gradle", "caches", "minecraft", "net", "minecraft", "minecraft"),
-                        "minecraft-%s.jar"));
-        clientLocations.add(
-                Pair.of(Paths.get(userHome, ".gradle", "caches", "retro_futura_gradle", "mc-vanilla"), "client.jar"));
-
-        List<Pair<Path, String>> serverLocations = new ArrayList<>();
-        serverLocations.add(Pair.of(txloaderCache, "server.jar"));
-        serverLocations.add(
-                Pair.of(
-                        Paths.get(userHome, ".gradle", "caches", "forge_gradle", "minecraft_repo", "versions"),
-                        "server.jar"));
-        serverLocations.add(
-                Pair.of(
-                        Paths.get(userHome, ".gradle", "caches", "minecraft", "net", "minecraft", "minecraft_server"),
-                        "minecraft_server-%s.jar"));
-        serverLocations.add(
-                Pair.of(Paths.get(userHome, ".gradle", "caches", "retro_futura_gradle", "mc-vanilla"), "server.jar"));
-
-        Stopwatch stopwatch = Stopwatch.createStarted();
-        for (Pair<Path, String> location : clientLocations) {
-            collect(location.getLeft(), location.getRight(), Side.CLIENT);
+        synchronized (CLIENT_LOCATIONS) {
+            CLIENT_LOCATIONS.add(Pair.of(txloaderCache, "client.jar"));
+            CLIENT_LOCATIONS
+                    .add(Pair.of(Paths.get(userHome, "AppData", "Roaming", ".minecraft", "versions"), "%s.jar"));
+            CLIENT_LOCATIONS.add(
+                    Pair.of(
+                            Paths.get(userHome, ".gradle", "caches", "forge_gradle", "minecraft_repo", "versions"),
+                            "client.jar"));
+            CLIENT_LOCATIONS.add(
+                    Pair.of(
+                            Paths.get(userHome, ".gradle", "caches", "minecraft", "net", "minecraft", "minecraft"),
+                            "minecraft-%s.jar"));
+            CLIENT_LOCATIONS.add(
+                    Pair.of(
+                            Paths.get(userHome, ".gradle", "caches", "retro_futura_gradle", "mc-vanilla"),
+                            "client.jar"));
         }
-        for (Pair<Path, String> location : serverLocations) {
-            collect(location.getLeft(), location.getRight(), Side.SERVER);
+
+        synchronized (SERVER_LOCATIONS) {
+            SERVER_LOCATIONS.add(Pair.of(txloaderCache, "server.jar"));
+            SERVER_LOCATIONS.add(
+                    Pair.of(
+                            Paths.get(userHome, ".gradle", "caches", "forge_gradle", "minecraft_repo", "versions"),
+                            "server.jar"));
+            SERVER_LOCATIONS.add(
+                    Pair.of(
+                            Paths.get(
+                                    userHome,
+                                    ".gradle",
+                                    "caches",
+                                    "minecraft",
+                                    "net",
+                                    "minecraft",
+                                    "minecraft_server"),
+                            "minecraft_server-%s.jar"));
+            SERVER_LOCATIONS.add(
+                    Pair.of(
+                            Paths.get(userHome, ".gradle", "caches", "retro_futura_gradle", "mc-vanilla"),
+                            "server.jar"));
         }
-        TXLoaderCore.LOGGER.debug("Scan for jars took {}ms", Long.toString(stopwatch.elapsed(TimeUnit.MILLISECONDS)));
     }
 
-    private static void collect(Path start, String fileName, Side side) {
+    static void index(boolean client) {
+        Set<Pair<Path, String>> locations = client ? CLIENT_LOCATIONS : SERVER_LOCATIONS;
+        synchronized (locations) {
+            for (Pair<Path, String> location : locations) {
+                collect(location.getLeft(), location.getRight(), client);
+            }
+        }
+    }
+
+    private static void collect(Path start, String fileName, boolean client) {
         if (!Files.isDirectory(start)) {
             return;
         }
@@ -137,12 +149,13 @@ class JarHandler {
                         return FileVisitResult.CONTINUE;
                     }
 
-                    if (side.isClient()) {
+                    if (client) {
                         CACHED_CLIENT_JARS.put(version, CompletableFuture.completedFuture(file));
                     } else {
                         CACHED_SERVER_JARS.put(version, CompletableFuture.completedFuture(file));
                     }
-                    TXLoaderCore.LOGGER.debug("Found {} jar for version {} at {}", side, version, file);
+                    TXLoaderCore.LOGGER
+                            .debug("Found {} jar for version {} at {}", client ? "CLIENT" : "SERVER", version, file);
                     return FileVisitResult.SKIP_SIBLINGS;
                 }
             });

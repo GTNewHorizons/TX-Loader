@@ -13,11 +13,9 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
 import java.util.jar.JarFile;
 
 import javax.annotation.Nonnull;
@@ -32,12 +30,12 @@ import glowredman.txloader.Asset.Source;
 class RemoteHandler {
 
     static volatile @Nullable String latestRelease;
-    static @Nullable CompletableFuture<Void> versionsStage;
+    static @Nullable CompletableFuture<Map<String, JVersion>> versionsStage;
     static final Map<String, JVersion> VERSIONS = Collections.synchronizedMap(new LinkedHashMap<>());
-    private static final Map<JVersionDetails, Map<String, JAsset>> ASSETS = new ConcurrentHashMap<>();
+    private static final Map<CompletableFuture<JVersionDetails>, CompletableFuture<Map<String, JAsset>>> ASSETS = new ConcurrentHashMap<>();
     private static final Map<String, CompletableFuture<JVersionDetails>> VERSION_DETAILS_CACHE = new ConcurrentHashMap<>();
 
-    static void fetchVersions() {
+    static Map<String, JVersion> fetchVersions() {
         JVersionManifest manifest;
 
         try {
@@ -54,6 +52,8 @@ class RemoteHandler {
         }
 
         TXLoaderCore.LOGGER.info("Successfully fetched Minecraft versions.");
+
+        return VERSIONS;
     }
 
     @Nonnull
@@ -67,26 +67,34 @@ class RemoteHandler {
         Source source = asset.getSource();
 
         if (source == Source.ASSET) {
-            // By always calling thenRunAsync() on the original CompletableFuture, multiple tasks can run concurrently.
-            return versionsStage.thenRunAsync(() -> fetchDirect(asset, path, version), TXLoaderCore.EXECUTOR_NET);
+            // By always calling thenRunAsync() on the original CompletableFuture (see getDetails()), multiple tasks can
+            // run concurrently.
+            return ASSETS
+                    .computeIfAbsent(getDetails(version), versionDetails -> downloadAssets(version, versionDetails))
+                    .thenAcceptAsync(assets -> fetchDirect(assets, asset, path, version), TXLoaderCore.EXECUTOR_NET);
         }
 
         // asset from client/server jar:
+
+        // TODO: make async somehow
+        if (source == Source.CLIENT && JarHandler.CACHED_CLIENT_JARS.isEmpty()) {
+            JarHandler.index(true);
+        }
+        if (source == Source.SERVER && JarHandler.CACHED_SERVER_JARS.isEmpty()) {
+            JarHandler.index(false);
+        }
+
         return (source == Source.CLIENT ? JarHandler.CACHED_CLIENT_JARS : JarHandler.CACHED_SERVER_JARS)
                 .computeIfAbsent(version, v -> downloadJar(asset, v, source))
                 .thenAcceptAsync(jarPath -> fetchFromJar(asset, jarPath, path), TXLoaderCore.EXECUTOR_IO);
     }
 
-    private static void fetchDirect(Asset asset, Path path, String version) {
-        JVersionDetails versionDetails = getDetails(version);
-
-        if (versionDetails == null) {
-            TXLoaderCore.LOGGER
-                    .error("Failed to get details for version {}! Path: {}", version, asset.resourceLocation);
+    private static void fetchDirect(Map<String, JAsset> assets, Asset asset, Path path, String version) {
+        if (assets == null) {
             return;
         }
 
-        JAsset jAsset = ASSETS.computeIfAbsent(versionDetails, JVersionDetails::getAssets).get(asset.resourceLocation);
+        JAsset jAsset = assets.get(asset.resourceLocation);
 
         if (jAsset == null) {
             TXLoaderCore.LOGGER.error("Failed to find asset {} for version {}!", asset.resourceLocation, version);
@@ -103,10 +111,18 @@ class RemoteHandler {
         TXLoaderCore.LOGGER.debug("Successfully fetched {}", asset.resourceLocation);
     }
 
-    private static CompletableFuture<Path> downloadJar(Asset asset, String version, Source source) {
-        return JarHandler.cacheStage.thenApplyAsync(void_ -> {
-            JVersionDetails versionDetails = getDetails(version);
+    private static CompletableFuture<Map<String, JAsset>> downloadAssets(String version,
+            CompletableFuture<JVersionDetails> versionDetails) {
+        return versionDetails.thenApplyAsync(details -> {
+            if (details == null) {
+                return null;
+            }
+            return details.getAssets();
+        }, TXLoaderCore.EXECUTOR_NET);
+    }
 
+    private static CompletableFuture<Path> downloadJar(Asset asset, String version, Source source) {
+        return JarHandler.cacheStage.thenCombineAsync(getDetails(version), (void_, versionDetails) -> {
             if (versionDetails == null) {
                 TXLoaderCore.LOGGER
                         .error("Failed to get details for version {}! Path: {}", version, asset.resourceLocation);
@@ -153,39 +169,17 @@ class RemoteHandler {
                 .fromJson(IOUtils.toString(manifestURL, StandardCharsets.UTF_8), JVersionManifest.class);
     }
 
-    private static JVersionDetails getDetails(String version) {
-        try {
-            return VERSION_DETAILS_CACHE.computeIfAbsent(
-                    version,
-                    ver -> versionsStage.thenApplyAsync(void_ -> downloadDetails(ver), TXLoaderCore.EXECUTOR_NET))
-                    .get();
-        } catch (CancellationException e) {
-            TXLoaderCore.LOGGER
-                    .error("The Future for downloading the version details for {} was cancelled!", version, e);
-        } catch (ExecutionException e) {
-            TXLoaderCore.LOGGER.error(
-                    "The Future for downloading the version details for {} failed during execution!",
-                    version,
-                    e);
-        } catch (InterruptedException e) {
-            TXLoaderCore.LOGGER
-                    .error("The Future for downloading the version details for {} was interrupted!", version, e);
-        }
-        return null;
-    }
-
-    private static JVersionDetails downloadDetails(String version) {
-        try {
-            final URL versionURL;
-            synchronized (VERSIONS) {
-                versionURL = new URL(VERSIONS.get(version).url);
+    private static CompletableFuture<JVersionDetails> getDetails(String version) {
+        return VERSION_DETAILS_CACHE.computeIfAbsent(version, ver -> versionsStage.thenApplyAsync(versions -> {
+            try {
+                return TXLoaderCore.GSON.fromJson(
+                        IOUtils.toString(new URL(versions.get(ver).url), StandardCharsets.UTF_8),
+                        JVersionDetails.class);
+            } catch (Exception e) {
+                TXLoaderCore.LOGGER.error("Failed to get version details", e);
+                return null;
             }
-            return TXLoaderCore.GSON
-                    .fromJson(IOUtils.toString(versionURL, StandardCharsets.UTF_8), JVersionDetails.class);
-        } catch (Exception e) {
-            TXLoaderCore.LOGGER.error("Failed to get version details", e);
-            return null;
-        }
+        }, TXLoaderCore.EXECUTOR_NET));
     }
 
     /*

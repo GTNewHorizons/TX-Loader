@@ -74,8 +74,8 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
             return;
         }
 
-        RemoteHandler.versionsStage = CompletableFuture.runAsync(RemoteHandler::fetchVersions, EXECUTOR_NET);
-        JarHandler.cacheStage = RemoteHandler.versionsStage.thenRunAsync(JarHandler::indexJars, EXECUTOR_IO)
+        RemoteHandler.versionsStage = CompletableFuture.supplyAsync(RemoteHandler::fetchVersions, EXECUTOR_NET);
+        JarHandler.cacheStage = RemoteHandler.versionsStage.thenRunAsync(JarHandler::initCache, EXECUTOR_IO)
                 .thenRunAsync(ConfigHandler::moveRLAssets, EXECUTOR_IO);
         JarHandler.cacheStage.thenRunAsync(ConfigHandler::load, EXECUTOR_IO);
     }
