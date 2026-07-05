@@ -24,6 +24,9 @@ import glowredman.txloader.progress.ProgressBarProxy;
 
 class RemoteHandler {
 
+    private static final int CONNECT_TIMEOUT = 5000;
+    private static final int READ_TIMEOUT = 10000;
+
     static String latestRelease;
     static final Map<String, JVersion> VERSIONS = new LinkedHashMap<>();
 
@@ -135,15 +138,36 @@ class RemoteHandler {
 
     private static JVersionManifest downloadManifest() throws JsonSyntaxException, IOException {
         final URL manifestURL = new URL("https://launchermeta.mojang.com/mc/game/version_manifest.json");
-        return TXLoaderCore.GSON
-                .fromJson(IOUtils.toString(manifestURL, StandardCharsets.UTF_8), JVersionManifest.class);
+        return TXLoaderCore.GSON.fromJson(fetch(manifestURL), JVersionManifest.class);
+    }
+
+    /**
+     * Reads the content of a URL to a String, applying connect and read timeouts. Unlike
+     * {@link IOUtils#toString(URL, java.nio.charset.Charset)}, this cannot hang indefinitely on networks that silently
+     * drop packets (e.g. captive portals or filtering proxies), which would otherwise freeze the game during coremod
+     * loading.
+     */
+    private static String fetch(URL url) throws IOException {
+        try (InputStream is = openStream(url)) {
+            return IOUtils.toString(is, StandardCharsets.UTF_8);
+        }
+    }
+
+    /**
+     * Opens a stream to a URL, applying connect and read timeouts. Unlike {@link URL#openStream()}, this cannot hang
+     * indefinitely on networks that silently drop packets.
+     */
+    static InputStream openStream(URL url) throws IOException {
+        URLConnection connection = url.openConnection();
+        connection.setConnectTimeout(CONNECT_TIMEOUT);
+        connection.setReadTimeout(READ_TIMEOUT);
+        return connection.getInputStream();
     }
 
     private static JVersionDetails downloadDetails(String version) {
         try {
             final URL versionURL = new URL(VERSIONS.get(version).url);
-            return TXLoaderCore.GSON
-                    .fromJson(IOUtils.toString(versionURL, StandardCharsets.UTF_8), JVersionDetails.class);
+            return TXLoaderCore.GSON.fromJson(fetch(versionURL), JVersionDetails.class);
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed to get version details", e);
             return null;
@@ -183,8 +207,7 @@ class RemoteHandler {
         private Map<String, JAsset> getAssets() {
             try {
                 final URL assetsURL = new URL(this.assetIndex.url);
-                return TXLoaderCore.GSON
-                        .fromJson(IOUtils.toString(assetsURL, StandardCharsets.UTF_8), JAssetIndex.class).objects;
+                return TXLoaderCore.GSON.fromJson(fetch(assetsURL), JAssetIndex.class).objects;
             } catch (Exception e) {
                 TXLoaderCore.LOGGER.error("Failed to get asset index", e);
                 // don't check this version again...
@@ -202,10 +225,7 @@ class RemoteHandler {
             Files.createDirectories(dir);
             Path jar = dir.resolve(fileName);
             TXLoaderCore.LOGGER.info("Downloading {} to {}", this.url, jar);
-            URLConnection connection = new URL(this.url).openConnection();
-            connection.setConnectTimeout(2000);
-            connection.setReadTimeout(10000);
-            try (InputStream is = connection.getInputStream()) {
+            try (InputStream is = openStream(new URL(this.url))) {
                 Files.copy(is, jar);
             }
             return jar;
@@ -231,10 +251,7 @@ class RemoteHandler {
             URL url = this.getURL();
             Files.createDirectories(path.getParent());
             TXLoaderCore.LOGGER.info("Downloading {} to {}", url, path);
-            URLConnection connection = url.openConnection();
-            connection.setConnectTimeout(2000);
-            connection.setReadTimeout(10000);
-            try (InputStream is = connection.getInputStream()) {
+            try (InputStream is = openStream(url)) {
                 Files.copy(is, path);
             }
         }
