@@ -32,8 +32,18 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
 
     static final Logger LOGGER = LogManager.getLogger("TX Loader");
     static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    static final Executor EXECUTOR_IO = new ThreadPoolExecutor(0, 512, 10, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
-    static final Executor EXECUTOR_NET = new ThreadPoolExecutor(0, 32, 10, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
+    static final Executor EXECUTOR_IO = new ThreadPoolExecutor(
+            0,
+            512,
+            10,
+            TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>());
+    static final Executor EXECUTOR_NET = new ThreadPoolExecutor(
+            0,
+            32,
+            10,
+            TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>());
     static File modFile;
     static Path mcLocation;
     static Path configDir;
