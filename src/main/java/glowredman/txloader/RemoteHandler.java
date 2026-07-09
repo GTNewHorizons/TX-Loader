@@ -14,7 +14,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.jar.JarFile;
 
@@ -30,19 +29,20 @@ import glowredman.txloader.Asset.Source;
 class RemoteHandler {
 
     static volatile @Nullable String latestRelease;
-    static @Nullable CompletableFuture<Map<String, JVersion>> versionsStage;
+    static @Nullable CompletableFuture<Map<String, JVersion>> versionsStage = new CompletableFuture<>();
     static final Map<String, JVersion> VERSIONS = Collections.synchronizedMap(new LinkedHashMap<>());
     private static final Map<CompletableFuture<JVersionDetails>, CompletableFuture<Map<String, JAsset>>> ASSETS = new ConcurrentHashMap<>();
     private static final Map<String, CompletableFuture<JVersionDetails>> VERSION_DETAILS_CACHE = new ConcurrentHashMap<>();
 
-    static Map<String, JVersion> fetchVersions() {
+    static void fetchVersions() {
         JVersionManifest manifest;
 
         try {
             manifest = downloadManifest();
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed to get Minecraft versions!", e);
-            throw new CompletionException(e);
+            versionsStage.completeExceptionally(e);
+            return;
         }
 
         latestRelease = manifest.latest.release;
@@ -53,13 +53,13 @@ class RemoteHandler {
 
         TXLoaderCore.LOGGER.info("Successfully fetched Minecraft versions.");
 
-        return VERSIONS;
+        versionsStage.complete(VERSIONS);
     }
 
     @Nonnull
     static CompletableFuture<Void> fetchAsset(@Nonnull Asset asset) {
         Path path = asset.getPath();
-        if (versionsStage == null || Files.exists(path)) {
+        if (Files.exists(path)) {
             return CompletableFuture.completedFuture(null);
         }
 

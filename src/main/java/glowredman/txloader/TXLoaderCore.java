@@ -7,7 +7,7 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -32,8 +32,8 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
 
     static final Logger LOGGER = LogManager.getLogger("TX Loader");
     static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    static final Executor EXECUTOR_IO = new ThreadPoolExecutor(0, 512, 10, TimeUnit.SECONDS, new SynchronousQueue<>());
-    static final Executor EXECUTOR_NET = new ThreadPoolExecutor(0, 32, 10, TimeUnit.SECONDS, new SynchronousQueue<>());
+    static final Executor EXECUTOR_IO = new ThreadPoolExecutor(0, 512, 10, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
+    static final Executor EXECUTOR_NET = new ThreadPoolExecutor(0, 32, 10, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
     static File modFile;
     static Path mcLocation;
     static Path configDir;
@@ -74,7 +74,7 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
             return;
         }
 
-        RemoteHandler.versionsStage = CompletableFuture.supplyAsync(RemoteHandler::fetchVersions, EXECUTOR_NET);
+        CompletableFuture.runAsync(RemoteHandler::fetchVersions, EXECUTOR_NET);
         JarHandler.cacheStage = RemoteHandler.versionsStage.thenRunAsync(JarHandler::initCache, EXECUTOR_IO)
                 .thenRunAsync(ConfigHandler::moveRLAssets, EXECUTOR_IO);
         JarHandler.cacheStage.thenRunAsync(ConfigHandler::load, EXECUTOR_IO);
