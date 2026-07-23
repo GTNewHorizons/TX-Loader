@@ -23,9 +23,9 @@ import net.minecraft.util.ResourceLocation;
 public class TXResourcePack implements IResourcePack {
 
     /**
-     * Folders under the load directory are named "<DisplayName>[<domain>]" for readability, but a resource
-     * domain must be the bare mod id. This extracts the domain out of the brackets so folder names map to the
-     * same domain a {@link ResourceLocation} for that mod actually carries.
+     * Folders under the load directory are named "<DisplayName>[<domain>]" for readability, but a resource domain must
+     * be the bare mod id. This extracts the domain out of the brackets so folder names map to the same domain a
+     * {@link ResourceLocation} for that mod actually carries.
      */
     private static final Pattern BRACKETED_DOMAIN = Pattern.compile("\\[([^\\[\\]]+)\\]$");
 
@@ -33,8 +33,8 @@ public class TXResourcePack implements IResourcePack {
     private final Path dir;
 
     /**
-     * Lazily built, and rebuilt on every {@link #getResourceDomains()} call (which Minecraft calls on every
-     * resource manager reload), so it stays in sync if folders are added/removed/renamed.
+     * Lazily built, and rebuilt on every {@link #getResourceDomains()} call (which Minecraft calls on every resource
+     * manager reload), so it stays in sync if folders are added/removed/renamed.
      */
     private volatile Map<String, Path> domainToFolder;
 
