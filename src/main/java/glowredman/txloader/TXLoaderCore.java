@@ -33,13 +33,13 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
     static final Logger LOGGER = LogManager.getLogger("TX Loader");
     static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     static final Executor EXECUTOR_IO = new ThreadPoolExecutor(
-            0,
+            512,
             512,
             10,
             TimeUnit.SECONDS,
             new LinkedBlockingQueue<>());
     static final Executor EXECUTOR_NET = new ThreadPoolExecutor(
-            0,
+            32,
             32,
             10,
             TimeUnit.SECONDS,
@@ -83,6 +83,9 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
             LOGGER.error("Failed to create resource directories!", e);
             return;
         }
+
+        ((ThreadPoolExecutor) EXECUTOR_IO).allowCoreThreadTimeOut(true);
+        ((ThreadPoolExecutor) EXECUTOR_NET).allowCoreThreadTimeOut(true);
 
         JarHandler.initCache();
         RemoteHandler.versionsStage = CompletableFuture.runAsync(ConfigHandler::moveRLAssets, EXECUTOR_IO)
