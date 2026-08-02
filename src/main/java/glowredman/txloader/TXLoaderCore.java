@@ -84,10 +84,15 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
             return;
         }
 
-        CompletableFuture.runAsync(RemoteHandler::fetchVersions, EXECUTOR_NET);
-        JarHandler.cacheStage = RemoteHandler.versionsStage.thenRunAsync(JarHandler::initCache, EXECUTOR_IO)
-                .thenRunAsync(ConfigHandler::moveRLAssets, EXECUTOR_IO);
-        JarHandler.cacheStage.thenRunAsync(ConfigHandler::load, EXECUTOR_IO);
+        JarHandler.initCache();
+        RemoteHandler.versionsStage = CompletableFuture.runAsync(ConfigHandler::moveRLAssets, EXECUTOR_IO)
+                .thenCombineAsync(
+                        CompletableFuture.supplyAsync(RemoteHandler::fetchVersions, EXECUTOR_NET),
+                        (void_, manifest) -> {
+                            ConfigHandler.load();
+                            return manifest;
+                        },
+                        EXECUTOR_IO);
     }
 
     @Override
@@ -97,12 +102,26 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
 
     /**
      *
+     * @deprecated {@link #getAssetBuilder(String, String)} should be used instead.
      * @param resourceLocation The ResourceLocation used to identify the asset on Mojang's side. Example:
      *                         <code>minecraft/lang/en_us.lang</code>
      * @return An {@link AssetBuilder} object to specify further properties
      * @author glowredman
      */
+    @Deprecated
     public static AssetBuilder getAssetBuilder(String resourceLocation) {
-        return new AssetBuilder(resourceLocation);
+        return new AssetBuilder(resourceLocation, Asset.LATEST_VERSION);
+    }
+
+    /**
+     *
+     * @param resourceLocation The ResourceLocation used to identify the asset on Mojang's side. Example:
+     *                         <code>minecraft/lang/en_us.lang</code>
+     * @return An {@link AssetBuilder} object to specify further properties
+     * @since 1.9.0
+     * @author glowredman
+     */
+    public static AssetBuilder getAssetBuilder(String resourceLocation, String version) {
+        return new AssetBuilder(resourceLocation, version);
     }
 }

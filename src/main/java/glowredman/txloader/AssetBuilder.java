@@ -10,8 +10,8 @@ public class AssetBuilder {
 
     private final Asset asset;
 
-    AssetBuilder(String resourceLocation) {
-        this.asset = new Asset(resourceLocation, RemoteHandler.latestRelease, Source.ASSET);
+    AssetBuilder(String resourceLocation, String version) {
+        this.asset = new Asset(resourceLocation, version, Source.ASSET);
     }
 
     /**
@@ -40,10 +40,13 @@ public class AssetBuilder {
 
     /**
      *
+     * @deprecated Not needed anymore, version is now a required argument of {@link #AssetBuilder(String, String)}.
      * @param version The Minecraft version in which the asset can be found. Defaults to the latest release.
      * @return This {@link AssetBuilder} object to allow chaining of method calls
      * @author glowredman
+     * @see TXLoaderCore#getAssetBuilder(String, String)
      */
+    @Deprecated
     public AssetBuilder setVersion(String version) {
         this.asset.version = version;
         return this;

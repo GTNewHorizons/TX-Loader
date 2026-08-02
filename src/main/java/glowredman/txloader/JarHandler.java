@@ -17,8 +17,6 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
-import javax.annotation.Nullable;
-
 import org.apache.commons.lang3.tuple.Pair;
 
 class JarHandler {
@@ -28,12 +26,42 @@ class JarHandler {
     private static final List<Pair<Path, String>> CLIENT_LOCATIONS = Collections.synchronizedList(new ArrayList<>());
     private static final List<Pair<Path, String>> SERVER_LOCATIONS = Collections.synchronizedList(new ArrayList<>());
 
-    static @Nullable CompletableFuture<Void> cacheStage;
-    static @Nullable Path txloaderCache;
+    static Path txloaderCache;
+    static Path versions;
+    static Path assetIndex;
 
     static void initCache() {
-        String userHome = System.getProperty("user.home");
-        String system = System.getProperty("os.name").toLowerCase();
+        setCachePath();
+        createJarLocations();
+
+        versions = txloaderCache.resolve("versions");
+        assetIndex = txloaderCache.resolve("assetIndex");
+
+        try {
+            Files.createDirectories(versions);
+            Files.createDirectories(assetIndex);
+        } catch (IOException e) {
+            TXLoaderCore.LOGGER.error("An exception occured during cache initialization!", e);
+            return;
+        }
+
+    }
+
+    static Path searchJar(String version, boolean isClient) {
+        List<Pair<Path, String>> locations = isClient ? CLIENT_LOCATIONS : SERVER_LOCATIONS;
+        for (Pair<Path, String> location : locations) {
+            Path path = findJar(location.getLeft(), location.getRight(), isClient, version);
+            if (path != null) {
+                return path;
+            }
+        }
+        return null;
+    }
+
+    private static void setCachePath() {
+        final String userHome = System.getProperty("user.home");
+        final String system = System.getProperty("os.name").toLowerCase();
+
         try {
             if (system.contains("win")) {
                 String temp = System.getenv("TEMP");
@@ -68,70 +96,45 @@ class JarHandler {
         }
 
         TXLoaderCore.LOGGER.debug("Cache location is {}", txloaderCache);
-
-        synchronized (CLIENT_LOCATIONS) {
-            CLIENT_LOCATIONS.add(Pair.of(txloaderCache, "client.jar"));
-            CLIENT_LOCATIONS
-                    .add(Pair.of(Paths.get(userHome, "AppData", "Roaming", ".minecraft", "versions"), "%s.jar"));
-            CLIENT_LOCATIONS.add(
-                    Pair.of(
-                            Paths.get(userHome, ".gradle", "caches", "forge_gradle", "minecraft_repo", "versions"),
-                            "client.jar"));
-            CLIENT_LOCATIONS.add(
-                    Pair.of(
-                            Paths.get(userHome, ".gradle", "caches", "minecraft", "net", "minecraft", "minecraft"),
-                            "minecraft-%s.jar"));
-            CLIENT_LOCATIONS.add(
-                    Pair.of(
-                            Paths.get(userHome, ".gradle", "caches", "retro_futura_gradle", "mc-vanilla"),
-                            "client.jar"));
-        }
-
-        synchronized (SERVER_LOCATIONS) {
-            SERVER_LOCATIONS.add(Pair.of(txloaderCache, "server.jar"));
-            SERVER_LOCATIONS.add(
-                    Pair.of(
-                            Paths.get(userHome, ".gradle", "caches", "forge_gradle", "minecraft_repo", "versions"),
-                            "server.jar"));
-            SERVER_LOCATIONS.add(
-                    Pair.of(
-                            Paths.get(
-                                    userHome,
-                                    ".gradle",
-                                    "caches",
-                                    "minecraft",
-                                    "net",
-                                    "minecraft",
-                                    "minecraft_server"),
-                            "minecraft_server-%s.jar"));
-            SERVER_LOCATIONS.add(
-                    Pair.of(
-                            Paths.get(userHome, ".gradle", "caches", "retro_futura_gradle", "mc-vanilla"),
-                            "server.jar"));
-        }
     }
 
-    static Path index(boolean client, String targetVersion) {
-        List<Pair<Path, String>> locations = client ? CLIENT_LOCATIONS : SERVER_LOCATIONS;
-        Path finalResult = null;
-        synchronized (locations) {
-            for (Pair<Path, String> location : locations) {
-                Path result = collect(location.getLeft(), location.getRight(), client, targetVersion);
-                if (result != null) {
-                    finalResult = result;
-                }
-            }
-        }
-        return finalResult;
+    private static void createJarLocations() {
+        final String userHome = System.getProperty("user.home");
+
+        // client
+        CLIENT_LOCATIONS.add(Pair.of(txloaderCache, "client.jar"));
+        CLIENT_LOCATIONS.add(Pair.of(Paths.get(userHome, "AppData", "Roaming", ".minecraft", "versions"), "%s.jar"));
+        CLIENT_LOCATIONS.add(
+                Pair.of(
+                        Paths.get(userHome, ".gradle", "caches", "forge_gradle", "minecraft_repo", "versions"),
+                        "client.jar"));
+        CLIENT_LOCATIONS.add(
+                Pair.of(
+                        Paths.get(userHome, ".gradle", "caches", "minecraft", "net", "minecraft", "minecraft"),
+                        "minecraft-%s.jar"));
+        CLIENT_LOCATIONS.add(
+                Pair.of(Paths.get(userHome, ".gradle", "caches", "retro_futura_gradle", "mc-vanilla"), "client.jar"));
+
+        // server
+        SERVER_LOCATIONS.add(Pair.of(txloaderCache, "server.jar"));
+        SERVER_LOCATIONS.add(
+                Pair.of(
+                        Paths.get(userHome, ".gradle", "caches", "forge_gradle", "minecraft_repo", "versions"),
+                        "server.jar"));
+        SERVER_LOCATIONS.add(
+                Pair.of(
+                        Paths.get(userHome, ".gradle", "caches", "minecraft", "net", "minecraft", "minecraft_server"),
+                        "minecraft_server-%s.jar"));
+        SERVER_LOCATIONS.add(
+                Pair.of(Paths.get(userHome, ".gradle", "caches", "retro_futura_gradle", "mc-vanilla"), "server.jar"));
     }
 
-    private static Path collect(Path start, String fileName, boolean client, String targetVersion) {
+    private static Path findJar(Path start, String fileName, boolean isClient, String version) {
         if (!Files.isDirectory(start)) {
             return null;
         }
 
-        FileVisitor visitor = new FileVisitor(start, fileName, client, targetVersion);
-
+        FileVisitor visitor = new FileVisitor(start, fileName, isClient, version);
         try {
             Files.walkFileTree(start, EnumSet.of(FileVisitOption.FOLLOW_LINKS), 2, visitor);
         } catch (IOException e) {
@@ -145,21 +148,20 @@ class JarHandler {
 
         private final Path start;
         private final String fileName;
-        private final boolean client;
+        private final boolean isClient;
         private final String targetVersion;
         Path result;
 
-        public FileVisitor(Path start, String fileName, boolean client, String targetVersion) {
+        public FileVisitor(Path start, String fileName, boolean isClient, String targetVersion) {
             this.start = start;
             this.fileName = fileName;
-            this.client = client;
+            this.isClient = isClient;
             this.targetVersion = targetVersion;
         }
 
         @Override
         public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-            if (!Files.isSameFile(dir, this.start)
-                    && !RemoteHandler.VERSIONS.containsKey(dir.getFileName().toString())) {
+            if (!Files.isSameFile(dir, this.start) && !dir.getFileName().toString().equals(this.targetVersion)) {
                 return FileVisitResult.SKIP_SUBTREE;
             }
             return FileVisitResult.CONTINUE;
@@ -168,7 +170,7 @@ class JarHandler {
         @Override
         public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
             Path parent = file.getParent();
-            if (Files.isSameFile(parent, this.start) || !attrs.isRegularFile() || attrs.size() <= 1024) {
+            if (Files.isSameFile(parent, this.start) || !attrs.isRegularFile() || attrs.size() <= 16384) {
                 return FileVisitResult.CONTINUE;
             }
 
@@ -177,18 +179,11 @@ class JarHandler {
                 return FileVisitResult.CONTINUE;
             }
 
-            if (version.equals(this.targetVersion)) {
-                this.result = file;
-            }
+            this.result = file;
 
-            if (this.client) {
-                CACHED_CLIENT_JARS.put(version, CompletableFuture.completedFuture(file));
-            } else {
-                CACHED_SERVER_JARS.put(version, CompletableFuture.completedFuture(file));
-            }
             TXLoaderCore.LOGGER
-                    .debug("Found {} jar for version {} at {}", this.client ? "CLIENT" : "SERVER", version, file);
-            return FileVisitResult.SKIP_SIBLINGS;
+                    .debug("Found {} JAR for version {} at {}", this.isClient ? "client" : "server", version, file);
+            return FileVisitResult.TERMINATE;
         }
     }
 }

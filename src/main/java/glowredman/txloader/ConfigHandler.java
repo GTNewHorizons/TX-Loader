@@ -36,9 +36,7 @@ class ConfigHandler {
         }
 
         try (BufferedReader reader = Files.newBufferedReader(configFile, StandardCharsets.UTF_8)) {
-            synchronized (ASSETS) {
-                ASSETS.addAll(TXLoaderCore.GSON.fromJson(reader, TYPE));
-            }
+            ASSETS.addAll(TXLoaderCore.GSON.fromJson(reader, TYPE));
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed to read config file!", e);
             return;
@@ -46,16 +44,12 @@ class ConfigHandler {
 
         TXLoaderCore.LOGGER.info("Successfully read config file.");
 
-        synchronized (ASSETS) {
-            ASSETS.forEach(RemoteHandler::fetchAsset);
-        }
+        ASSETS.forEach(RemoteHandler::fetchAsset);
     }
 
     static boolean save() {
         try {
-            synchronized (ASSETS) {
-                Files.write(configFile, TXLoaderCore.GSON.toJson(ASSETS, TYPE).getBytes(StandardCharsets.UTF_8));
-            }
+            Files.write(configFile, TXLoaderCore.GSON.toJson(ASSETS, TYPE).getBytes(StandardCharsets.UTF_8));
             return true;
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed saving config!", e);

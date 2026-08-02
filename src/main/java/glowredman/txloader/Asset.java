@@ -6,6 +6,9 @@ import java.util.stream.Collectors;
 
 public class Asset {
 
+    // setting the version is no longer optional, this is for backwards compatibility
+    static final String LATEST_VERSION = "26.2";
+
     String resourceLocation;
     String resourceLocationOverride;
     boolean forceLoad;
@@ -28,7 +31,7 @@ public class Asset {
     }
 
     String getVersion() {
-        return this.version == null ? RemoteHandler.latestRelease : this.version;
+        return this.version == null ? LATEST_VERSION : this.version;
     }
 
     Source getSource() {

@@ -33,6 +33,7 @@ public class TXResourcePack implements IResourcePack {
 
     @Override
     public boolean resourceExists(ResourceLocation rl) {
+        RemoteHandler.ensureNoBlocking();
         try {
             return getResourcePath(rl).toFile().exists();
         } catch (InvalidPathException e) {
@@ -49,6 +50,7 @@ public class TXResourcePack implements IResourcePack {
 
     @Override
     public Set<String> getResourceDomains() {
+        RemoteHandler.ensureNoBlocking();
         Set<String> resourceDomains = new HashSet<>();
         try (Stream<Path> dirs = Files.list(this.dir).filter(Files::isDirectory)) {
             dirs.forEach(p -> resourceDomains.add(p.getFileName().toString()));

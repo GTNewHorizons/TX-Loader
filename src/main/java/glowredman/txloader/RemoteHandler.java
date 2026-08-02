@@ -2,23 +2,21 @@ package glowredman.txloader;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.jar.JarFile;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 import org.apache.commons.io.IOUtils;
 
@@ -28,63 +26,168 @@ import glowredman.txloader.Asset.Source;
 
 class RemoteHandler {
 
-    static volatile @Nullable String latestRelease;
-    static @Nullable CompletableFuture<Map<String, JVersion>> versionsStage = new CompletableFuture<>();
-    static final Map<String, JVersion> VERSIONS = Collections.synchronizedMap(new LinkedHashMap<>());
-    private static final Map<CompletableFuture<JVersionDetails>, CompletableFuture<Map<String, JAsset>>> ASSETS = new ConcurrentHashMap<>();
-    private static final Map<String, CompletableFuture<JVersionDetails>> VERSION_DETAILS_CACHE = new ConcurrentHashMap<>();
+    static CompletableFuture<JVersionManifest> versionsStage;
+    private static final Map<String, CompletableFuture<JVersionDetails>> DETAILS = new ConcurrentHashMap<>();
+    private static final Map<String, CompletableFuture<Map<String, JAsset>>> ASSET_INDICES = new ConcurrentHashMap<>();
+    static final Set<CompletableFuture<Void>> BLOCKING_FUTURES = new HashSet<>();
+    private static final Set<Path> PATHS = new HashSet<>();
 
-    static void fetchVersions() {
+    static JVersionManifest fetchVersions() {
         JVersionManifest manifest;
 
         try {
             manifest = downloadManifest();
         } catch (Exception e) {
-            TXLoaderCore.LOGGER.error("Failed to get Minecraft versions!", e);
-            versionsStage.completeExceptionally(e);
-            return;
+            TXLoaderCore.LOGGER.error("Failed to get version manifest!", e);
+            manifest = new JVersionManifest();
+            manifest.urls = Collections.emptyMap();
+            return manifest;
         }
 
-        latestRelease = manifest.latest.release;
-
-        synchronized (VERSIONS) {
-            manifest.versions.forEach(JVersion::cache);
+        Map<String, String> urls = new ConcurrentHashMap<>(manifest.versions.size(), 1.0f);
+        for (JVersion version : manifest.versions) {
+            urls.put(version.id, version.url);
         }
+        manifest.urls = urls;
 
         TXLoaderCore.LOGGER.info("Successfully fetched Minecraft versions.");
-
-        versionsStage.complete(VERSIONS);
+        return manifest;
     }
 
-    @Nonnull
+    private static JVersionManifest downloadManifest() throws JsonSyntaxException, IOException {
+        final URL manifestURL = new URL("https://launchermeta.mojang.com/mc/game/version_manifest.json");
+        return TXLoaderCore.GSON
+                .fromJson(IOUtils.toString(manifestURL, StandardCharsets.UTF_8), JVersionManifest.class);
+    }
+
     static CompletableFuture<Void> fetchAsset(@Nonnull Asset asset) {
         Path path = asset.getPath();
+        String version = asset.getVersion();
+        Source source = asset.getSource();
+
+        if (PATHS.contains(path)) {
+            TXLoaderCore.LOGGER.warn(
+                    "Duplicate asset defined for {}, skipping {} on version {} for source {}",
+                    asset.getResourceLocation(),
+                    asset.resourceLocation,
+                    version,
+                    source);
+            return CompletableFuture.completedFuture(null);
+        }
+
+        PATHS.add(path);
+
         if (Files.exists(path)) {
             return CompletableFuture.completedFuture(null);
         }
 
-        String version = asset.getVersion();
-        Source source = asset.getSource();
+        CompletableFuture<JVersionDetails> detailsStage = DETAILS
+                .computeIfAbsent(version, RemoteHandler::verifyDetailsExist);
 
         if (source == Source.ASSET) {
-            // By always calling thenRunAsync() on the original CompletableFuture (see getDetails()), multiple tasks can
-            // run concurrently.
-            return ASSETS
-                    .computeIfAbsent(getDetails(version), versionDetails -> downloadAssets(version, versionDetails))
-                    .thenAcceptAsync(assets -> fetchDirect(assets, asset, path, version), TXLoaderCore.EXECUTOR_NET);
+            CompletableFuture<Void> future = ASSET_INDICES.computeIfAbsent(
+                    version,
+                    v -> detailsStage
+                            .thenApplyAsync(details -> verifyAssetIndexExists(v, details), TXLoaderCore.EXECUTOR_NET))
+                    .thenAcceptAsync(
+                            assetIndex -> fetchDirect(assetIndex, asset, path, version),
+                            TXLoaderCore.EXECUTOR_NET);
+            BLOCKING_FUTURES.add(future);
+            return future;
         }
 
         // asset from client/server jar:
-        return (source == Source.CLIENT ? JarHandler.CACHED_CLIENT_JARS : JarHandler.CACHED_SERVER_JARS)
-                .computeIfAbsent(version, v -> downloadJar(asset, v, source))
+        boolean isClient = source == Source.CLIENT;
+        CompletableFuture<Void> future = (isClient ? JarHandler.CACHED_CLIENT_JARS : JarHandler.CACHED_SERVER_JARS)
+                .computeIfAbsent(
+                        version,
+                        v -> detailsStage.thenApplyAsync(
+                                details -> verifyJarExists(details, v, isClient),
+                                TXLoaderCore.EXECUTOR_NET))
                 .thenAcceptAsync(jarPath -> fetchFromJar(asset, jarPath, path), TXLoaderCore.EXECUTOR_IO);
+        BLOCKING_FUTURES.add(future);
+        return future;
+    }
+
+    private static CompletableFuture<JVersionDetails> verifyDetailsExist(String version) {
+        return versionsStage.thenApplyAsync(manifest -> {
+            Path path = JarHandler.versions.resolve(version + ".json");
+
+            if (Files.notExists(path)) {
+                String url = manifest.urls.get(version);
+
+                if (url == null) {
+                    TXLoaderCore.LOGGER.error("Version details URL for version {} not known!", version);
+                    return null;
+                }
+
+                try {
+                    download(url, path);
+                } catch (Exception e) {
+                    TXLoaderCore.LOGGER.error(
+                            "An error occurred while downloading the version details for version {}!",
+                            version,
+                            e);
+                    return null;
+                }
+            }
+
+            try {
+                return TXLoaderCore.GSON.fromJson(Files.newBufferedReader(path), JVersionDetails.class);
+            } catch (Exception e) {
+                TXLoaderCore.LOGGER.error("Failed to get version details for version {}", e);
+                return null;
+            }
+        }, TXLoaderCore.EXECUTOR_NET);
+    }
+
+    private static Map<String, JAsset> verifyAssetIndexExists(String version, JVersionDetails details) {
+        Path path = JarHandler.assetIndex.resolve(version + ".json");
+
+        if (Files.notExists(path)) {
+            if (details == null) {
+                return Collections.emptyMap();
+            }
+
+            try {
+                download(details.assetIndex.url, path);
+            } catch (Exception e) {
+                TXLoaderCore.LOGGER.error("Failed to download asset index for version {}!", version, e);
+                return Collections.emptyMap();
+            }
+        }
+
+        try {
+            return TXLoaderCore.GSON.fromJson(Files.newBufferedReader(path), JAssetIndex.class).objects;
+        } catch (Exception e) {
+            TXLoaderCore.LOGGER.error("Failed to get asset index for version {}!", version, e);
+            return Collections.emptyMap();
+        }
+    }
+
+    private static Path verifyJarExists(JVersionDetails details, String version, boolean isClient) {
+        Path path = JarHandler.searchJar(version, isClient);
+
+        if (path == null) {
+            if (details == null) {
+                return null;
+            }
+
+            try {
+                if (isClient) {
+                    return details.downloads.client.downloadJar(version, "client.jar");
+                }
+                return details.downloads.server.downloadJar(version, "server.jar");
+            } catch (Exception e) {
+                TXLoaderCore.LOGGER
+                        .error("Failed to download {} JAR for version {}!", isClient ? "client" : "server", version, e);
+                return null;
+            }
+        }
+        return path;
     }
 
     private static void fetchDirect(Map<String, JAsset> assets, Asset asset, Path path, String version) {
-        if (assets == null) {
-            return;
-        }
-
         JAsset jAsset = assets.get(asset.resourceLocation);
 
         if (jAsset == null) {
@@ -93,54 +196,12 @@ class RemoteHandler {
         }
 
         try {
-            Files.createDirectories(path.getParent());
             jAsset.download(path);
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed to get asset! Path: {}", asset.resourceLocation, e);
         }
 
         TXLoaderCore.LOGGER.debug("Successfully fetched {}", asset.resourceLocation);
-    }
-
-    private static CompletableFuture<Map<String, JAsset>> downloadAssets(String version,
-            CompletableFuture<JVersionDetails> versionDetails) {
-        return versionDetails.thenApplyAsync(details -> {
-            if (details == null) {
-                return null;
-            }
-            return details.getAssets();
-        }, TXLoaderCore.EXECUTOR_NET);
-    }
-
-    private static CompletableFuture<Path> downloadJar(Asset asset, String version, Source source) {
-        return JarHandler.cacheStage.thenCombineAsync(getDetails(version), (void_, versionDetails) -> {
-            boolean client = source == Source.CLIENT;
-            Path p = JarHandler.index(client, version);
-            if (p != null) {
-                return p;
-            }
-
-            if (versionDetails == null) {
-                TXLoaderCore.LOGGER
-                        .error("Failed to get details for version {}! Path: {}", version, asset.resourceLocation);
-                return null;
-            }
-
-            if (client) {
-                try {
-                    return versionDetails.downloads.client.downloadJar(version, "client.jar");
-                } catch (Exception e) {
-                    TXLoaderCore.LOGGER.error("Failed to download client jar and no cached jar was found", e);
-                    return null;
-                }
-            }
-            try {
-                return versionDetails.downloads.server.downloadJar(version, "server.jar");
-            } catch (Exception e) {
-                TXLoaderCore.LOGGER.error("Failed to download server jar and no cached jar was found", e);
-                return null;
-            }
-        }, TXLoaderCore.EXECUTOR_NET);
     }
 
     private static void fetchFromJar(Asset asset, Path jarPath, Path targetPath) {
@@ -160,23 +221,33 @@ class RemoteHandler {
         TXLoaderCore.LOGGER.debug("Successfully fetched {}", asset.resourceLocation);
     }
 
-    private static JVersionManifest downloadManifest() throws JsonSyntaxException, IOException {
-        final URL manifestURL = new URL("https://launchermeta.mojang.com/mc/game/version_manifest.json");
-        return TXLoaderCore.GSON
-                .fromJson(IOUtils.toString(manifestURL, StandardCharsets.UTF_8), JVersionManifest.class);
+    private static void download(String url, Path path) throws IOException {
+        TXLoaderCore.LOGGER.info("Downloading {} to {}", url, path);
+        URLConnection connection = new URL(url).openConnection();
+        connection.setConnectTimeout(2000);
+        connection.setReadTimeout(10000);
+        try (InputStream is = connection.getInputStream()) {
+            Files.copy(is, path);
+        }
     }
 
-    private static CompletableFuture<JVersionDetails> getDetails(String version) {
-        return VERSION_DETAILS_CACHE.computeIfAbsent(version, ver -> versionsStage.thenApplyAsync(versions -> {
-            try {
-                return TXLoaderCore.GSON.fromJson(
-                        IOUtils.toString(new URL(versions.get(ver).url), StandardCharsets.UTF_8),
-                        JVersionDetails.class);
-            } catch (Exception e) {
-                TXLoaderCore.LOGGER.error("Failed to get version details", e);
-                return null;
+    /**
+     * Ensures that no assets are currently being fetched (from any {@link Source})
+     */
+    static void ensureNoBlocking() {
+        synchronized (BLOCKING_FUTURES) {
+            for (CompletableFuture<Void> future : BLOCKING_FUTURES) {
+                if (future.isDone()) {
+                    continue;
+                }
+                try {
+                    future.join();
+                } catch (Exception e) {
+                    TXLoaderCore.LOGGER.warn("", e);
+                }
             }
-        }, TXLoaderCore.EXECUTOR_NET));
+            BLOCKING_FUTURES.clear();
+        }
     }
 
     /*
@@ -187,6 +258,7 @@ class RemoteHandler {
 
         JLatest latest;
         List<JVersion> versions;
+        transient Map<String, String> urls;
     }
 
     static class JLatest {
@@ -198,28 +270,12 @@ class RemoteHandler {
 
         String id;
         String url;
-
-        void cache() {
-            VERSIONS.put(this.id, this);
-        }
     }
 
     static class JVersionDetails {
 
         JSourceDetails assetIndex;
         JDownloads downloads;
-
-        Map<String, JAsset> getAssets() {
-            try {
-                final URL assetsURL = new URL(this.assetIndex.url);
-                return TXLoaderCore.GSON
-                        .fromJson(IOUtils.toString(assetsURL, StandardCharsets.UTF_8), JAssetIndex.class).objects;
-            } catch (Exception e) {
-                TXLoaderCore.LOGGER.error("Failed to get asset index", e);
-                // don't check this version again...
-                return new HashMap<>();
-            }
-        }
     }
 
     static class JSourceDetails {
@@ -230,13 +286,7 @@ class RemoteHandler {
             Path dir = JarHandler.txloaderCache.resolve(version);
             Files.createDirectories(dir);
             Path jar = dir.resolve(fileName);
-            TXLoaderCore.LOGGER.info("Downloading {} to {}", this.url, jar);
-            URLConnection connection = new URL(this.url).openConnection();
-            connection.setConnectTimeout(2000);
-            connection.setReadTimeout(10000);
-            try (InputStream is = connection.getInputStream()) {
-                Files.copy(is, jar);
-            }
+            RemoteHandler.download(this.url, jar);
             return jar;
         }
     }
@@ -257,24 +307,13 @@ class RemoteHandler {
         String hash;
 
         void download(Path path) throws IOException {
-            URL url = this.getURL();
             Files.createDirectories(path.getParent());
-            TXLoaderCore.LOGGER.info("Downloading {} to {}", url, path);
-            URLConnection connection = url.openConnection();
-            connection.setConnectTimeout(2000);
-            connection.setReadTimeout(10000);
-            try (InputStream is = connection.getInputStream()) {
-                Files.copy(is, path);
-            }
-        }
-
-        URL getURL() throws MalformedURLException {
             StringBuilder sb = new StringBuilder(84);
             sb.append("https://resources.download.minecraft.net/");
             sb.append(this.hash, 0, 2);
             sb.append('/');
             sb.append(this.hash);
-            return new URL(sb.toString());
+            RemoteHandler.download(sb.toString(), path);
         }
     }
 }
