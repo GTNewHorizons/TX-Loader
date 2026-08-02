@@ -68,26 +68,23 @@ public class AssetBuilder {
     /**
      * Queues this {@link Asset} to be fetched as soon as possible (if it doesn't already exist).
      * 
-     * @deprecated Use {@link #fetch()} instead.
      * @author glowredman
+     * @see #fetch()
      */
-    @Deprecated
     public void add() {
         this.fetch();
     }
 
     /**
-     * Queues this {@link Asset} to be fetched as soon as possible (if it doesn't already exist).
-     * <p>
-     * <b>Note:</b> The asset may not be available when it's needed. This depends on various factors, for example when
-     * this method is called, how many {@link Asset}s are queued or how fast the player's Internet connection is. Mods
-     * are expected to use the returned {@link CompletableFuture} to {@link CompletableFuture#join() block} the (main)
-     * thread before using the asset. To reduce the time the (main) thread is blocked, call {@link #fetch()} as soon as
-     * possible.
+     * Queues this {@link Asset} to be fetched as soon as possible (if it doesn't already exist). Unlike {@link #add()},
+     * this method returns a {@link CompletableFuture}. It can be used to ensure an {@link Asset} has been fetched by
+     * blocking the main thread (using {@link CompletableFuture#join() join()}). This is usually only necessary if this
+     * method is called after all resources were reloaded.
      * 
      * @return A {@link CompletableFuture} which can be used to block the (main) thread.
      * @since 1.9.0
      * @author glowredman
+     * @see #add()
      */
     @Nonnull
     public CompletableFuture<Void> fetch() {
