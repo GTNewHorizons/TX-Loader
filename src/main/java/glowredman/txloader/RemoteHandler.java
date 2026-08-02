@@ -4,9 +4,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -18,13 +18,14 @@ import java.util.jar.JarFile;
 
 import javax.annotation.Nonnull;
 
-import org.apache.commons.io.IOUtils;
-
-import com.google.gson.JsonSyntaxException;
-
 import glowredman.txloader.Asset.Source;
 
 class RemoteHandler {
+
+    private static final String MANIFEST_URL = "https://launchermeta.mojang.com/mc/game/version_manifest.json";
+    private static final String RESOURCES_URL = "https://resources.download.minecraft.net/";
+    private static final int CONNECT_TIMEOUT = 5000;
+    private static final int READ_TIMEOUT = 10000;
 
     static CompletableFuture<JVersionManifest> versionsStage;
     private static final Map<String, CompletableFuture<JVersionDetails>> DETAILS = new ConcurrentHashMap<>();
@@ -33,12 +34,29 @@ class RemoteHandler {
     private static final Set<Path> PATHS = new HashSet<>();
 
     static JVersionManifest fetchVersions() {
-        JVersionManifest manifest;
+        Path path = JarHandler.txloaderCache.resolve("version_manifest.json");
 
         try {
-            manifest = downloadManifest();
+            // always try to update the manifest because it changes regularly
+            download(MANIFEST_URL, path);
+            TXLoaderCore.LOGGER.info("Successfully fetched Minecraft versions.");
         } catch (Exception e) {
-            TXLoaderCore.LOGGER.error("Failed to get version manifest!", e);
+            TXLoaderCore.LOGGER.error("Failed to update Minecraft versions! Attempting to use cached manifest...", e);
+        }
+
+        JVersionManifest manifest = null;
+
+        if (Files.exists(path)) {
+            try {
+                manifest = TXLoaderCore.GSON.fromJson(Files.newBufferedReader(path), JVersionManifest.class);
+            } catch (Exception e) {
+                TXLoaderCore.LOGGER.error("Manifest file could not be parsed!", e);
+            }
+        } else {
+            TXLoaderCore.LOGGER.error("No cached manifest found!");
+        }
+
+        if (manifest == null) {
             manifest = new JVersionManifest();
             manifest.urls = Collections.emptyMap();
             return manifest;
@@ -50,14 +68,7 @@ class RemoteHandler {
         }
         manifest.urls = urls;
 
-        TXLoaderCore.LOGGER.info("Successfully fetched Minecraft versions.");
         return manifest;
-    }
-
-    private static JVersionManifest downloadManifest() throws JsonSyntaxException, IOException {
-        final URL manifestURL = new URL("https://launchermeta.mojang.com/mc/game/version_manifest.json");
-        return TXLoaderCore.GSON
-                .fromJson(IOUtils.toString(manifestURL, StandardCharsets.UTF_8), JVersionManifest.class);
     }
 
     static CompletableFuture<Void> fetchAsset(@Nonnull Asset asset) {
@@ -224,10 +235,10 @@ class RemoteHandler {
     private static void download(String url, Path path) throws IOException {
         TXLoaderCore.LOGGER.info("Downloading {} to {}", url, path);
         URLConnection connection = new URL(url).openConnection();
-        connection.setConnectTimeout(2000);
-        connection.setReadTimeout(10000);
+        connection.setConnectTimeout(CONNECT_TIMEOUT);
+        connection.setReadTimeout(READ_TIMEOUT);
         try (InputStream is = connection.getInputStream()) {
-            Files.copy(is, path);
+            Files.copy(is, path, StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
@@ -309,7 +320,7 @@ class RemoteHandler {
         void download(Path path) throws IOException {
             Files.createDirectories(path.getParent());
             StringBuilder sb = new StringBuilder(84);
-            sb.append("https://resources.download.minecraft.net/");
+            sb.append(RESOURCES_URL);
             sb.append(this.hash, 0, 2);
             sb.append('/');
             sb.append(this.hash);
