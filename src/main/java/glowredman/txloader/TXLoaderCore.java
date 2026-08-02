@@ -84,6 +84,10 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
             return;
         }
 
+        if (FMLLaunchHandler.side().isServer()) {
+            return;
+        }
+
         ((ThreadPoolExecutor) EXECUTOR_IO).allowCoreThreadTimeOut(true);
         ((ThreadPoolExecutor) EXECUTOR_NET).allowCoreThreadTimeOut(true);
 
