@@ -254,7 +254,7 @@ class RemoteHandler {
                 try {
                     future.join();
                 } catch (Exception e) {
-                    TXLoaderCore.LOGGER.warn("", e);
+                    TXLoaderCore.LOGGER.warn("A future completed exceptionally!", e);
                 }
             }
             BLOCKING_FUTURES.clear();
@@ -269,7 +269,7 @@ class RemoteHandler {
 
         JLatest latest;
         List<JVersion> versions;
-        transient Map<String, String> urls;
+        transient Map<String, String> urls; // ignored by GSON
     }
 
     static class JLatest {
