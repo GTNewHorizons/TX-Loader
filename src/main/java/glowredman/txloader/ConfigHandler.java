@@ -49,7 +49,11 @@ class ConfigHandler {
 
     static boolean save() {
         try {
-            Files.write(configFile, TXLoaderCore.GSON.toJson(ASSETS, TYPE).getBytes(StandardCharsets.UTF_8));
+            String json;
+            synchronized (ASSETS) {
+                json = TXLoaderCore.GSON.toJson(ASSETS, TYPE);
+            }
+            Files.write(configFile, json.getBytes(StandardCharsets.UTF_8));
             return true;
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed saving config!", e);
