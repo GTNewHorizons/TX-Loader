@@ -84,14 +84,13 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
             return;
         }
 
-        if (FMLLaunchHandler.side().isServer()) {
+        if (FMLLaunchHandler.side().isServer() || JarHandler.initCache()) {
             return;
         }
 
         ((ThreadPoolExecutor) EXECUTOR_IO).allowCoreThreadTimeOut(true);
         ((ThreadPoolExecutor) EXECUTOR_NET).allowCoreThreadTimeOut(true);
 
-        JarHandler.initCache();
         RemoteHandler.versionsStage = CompletableFuture.runAsync(ConfigHandler::moveRLAssets, EXECUTOR_IO)
                 .thenCombineAsync(
                         CompletableFuture.supplyAsync(RemoteHandler::fetchVersions, EXECUTOR_NET),

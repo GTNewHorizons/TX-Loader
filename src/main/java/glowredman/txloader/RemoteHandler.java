@@ -27,7 +27,7 @@ class RemoteHandler {
     private static final int CONNECT_TIMEOUT = 5000;
     private static final int READ_TIMEOUT = 10000;
 
-    static CompletableFuture<JVersionManifest> versionsStage;
+    static CompletableFuture<JVersionManifest> versionsStage = new CompletableFuture<>(); // dummy value, prevents NPEs
     private static final Map<String, CompletableFuture<JVersionDetails>> DETAILS = new ConcurrentHashMap<>();
     private static final Map<String, CompletableFuture<Map<String, JAsset>>> ASSET_INDICES = new ConcurrentHashMap<>();
     static final Set<CompletableFuture<Void>> BLOCKING_FUTURES = new HashSet<>();
@@ -267,14 +267,8 @@ class RemoteHandler {
 
     static class JVersionManifest {
 
-        JLatest latest;
         List<JVersion> versions;
         transient Map<String, String> urls; // ignored by GSON
-    }
-
-    static class JLatest {
-
-        String release;
     }
 
     static class JVersion {

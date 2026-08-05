@@ -30,7 +30,10 @@ class JarHandler {
     static Path versions;
     static Path assetIndex;
 
-    static void initCache() {
+    /**
+     * @return {@code true} if either the {@link #versions} or {@link #assetIndex} directory don't exist.
+     */
+    static boolean initCache() {
         setCachePath();
         createJarLocations();
 
@@ -40,11 +43,11 @@ class JarHandler {
         try {
             Files.createDirectories(versions);
             Files.createDirectories(assetIndex);
-        } catch (IOException e) {
+        } catch (Exception e) {
             TXLoaderCore.LOGGER.error("An exception occured during cache initialization!", e);
-            return;
+            return !Files.isDirectory(versions) || !Files.isDirectory(assetIndex);
         }
-
+        return false;
     }
 
     static Path searchJar(String version, boolean isClient) {
@@ -137,7 +140,7 @@ class JarHandler {
         FileVisitor visitor = new FileVisitor(start, fileName, isClient, version);
         try {
             Files.walkFileTree(start, EnumSet.of(FileVisitOption.FOLLOW_LINKS), 2, visitor);
-        } catch (IOException e) {
+        } catch (Exception e) {
             TXLoaderCore.LOGGER.debug("Cannot walk cache directory {}", start, e);
         }
 
