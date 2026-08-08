@@ -94,13 +94,15 @@ class RemoteHandler {
         }
 
         CompletableFuture<JVersionDetails> detailsStage = DETAILS
-                .computeIfAbsent(version, RemoteHandler::verifyDetailsExist);
+                .computeIfAbsent(version, RemoteHandler::verifyDetailsExist)
+                .whenComplete((details, t) -> resetOnFailure(DETAILS, version, details));
 
         if (source == Source.ASSET) {
             CompletableFuture<Void> future = ASSET_INDICES.computeIfAbsent(
                     version,
                     v -> detailsStage
-                            .thenApplyAsync(details -> verifyAssetIndexExists(v, details), TXLoaderCore.EXECUTOR_NET))
+                            .thenApplyAsync(details -> verifyAssetIndexExists(v, details), TXLoaderCore.EXECUTOR_NET)
+                            .whenComplete((index, t) -> resetOnFailure(ASSET_INDICES, v, index)))
                     .thenAcceptAsync(
                             assetIndex -> fetchDirect(assetIndex, asset, path, version),
                             TXLoaderCore.EXECUTOR_NET);
@@ -114,12 +116,14 @@ class RemoteHandler {
 
         // asset from client/server jar:
         boolean isClient = source == Source.CLIENT;
-        CompletableFuture<Void> future = (isClient ? JarHandler.CACHED_CLIENT_JARS : JarHandler.CACHED_SERVER_JARS)
-                .computeIfAbsent(
-                        version,
-                        v -> detailsStage.thenApplyAsync(
-                                details -> verifyJarExists(details, v, isClient),
-                                TXLoaderCore.EXECUTOR_NET))
+
+        Map<String, CompletableFuture<Path>> cachedJars = isClient ? JarHandler.CACHED_CLIENT_JARS
+                : JarHandler.CACHED_SERVER_JARS;
+        CompletableFuture<Void> future = cachedJars.computeIfAbsent(
+                version,
+                v -> detailsStage
+                        .thenApplyAsync(details -> verifyJarExists(details, v, isClient), TXLoaderCore.EXECUTOR_NET)
+                        .whenComplete((jarPath, t) -> resetOnFailure(cachedJars, v, jarPath)))
                 .thenAcceptAsync(jarPath -> fetchFromJar(asset, jarPath, path), TXLoaderCore.EXECUTOR_IO);
 
         synchronized (BLOCKING_FUTURES) {
@@ -166,14 +170,14 @@ class RemoteHandler {
 
         if (Files.notExists(path)) {
             if (details == null) {
-                return Collections.emptyMap();
+                return null;
             }
 
             try {
                 download(details.assetIndex.url, path);
             } catch (Exception e) {
                 TXLoaderCore.LOGGER.error("Failed to download asset index for version {}!", version, e);
-                return Collections.emptyMap();
+                return null;
             }
         }
 
@@ -181,7 +185,7 @@ class RemoteHandler {
             return TXLoaderCore.GSON.fromJson(Files.newBufferedReader(path), JAssetIndex.class).objects;
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed to get asset index for version {}!", version, e);
-            return Collections.emptyMap();
+            return null;
         }
     }
 
@@ -258,6 +262,11 @@ class RemoteHandler {
         connection.setReadTimeout(READ_TIMEOUT);
         try (InputStream is = connection.getInputStream()) {
             Files.copy(is, path, StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    private static <T> void resetOnFailure(Map<String, CompletableFuture<T>> map, String key, T result) {
+        if (result == null) {
+            map.remove(key);
         }
     }
 
