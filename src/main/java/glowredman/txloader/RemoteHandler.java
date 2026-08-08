@@ -262,9 +262,18 @@ class RemoteHandler {
     }
 
     /**
-     * Ensures that no assets are currently being fetched (from any {@link Source})
+     * Ensures that all futures are completed
      */
     static void ensureNoBlocking() {
+        // copying old ResourceLoader files, fetching version manifest, loading config
+        try {
+            versionsStage.join();
+        } catch (Exception e) {
+            TXLoaderCore.LOGGER.warn("A future completed exceptionally!", e);
+        }
+
+        // fetch assets (directly or from JARs), this implicitly includes downloads of version details, asset indices
+        // and JARs
         synchronized (BLOCKING_FUTURES) {
             for (CompletableFuture<Void> future : BLOCKING_FUTURES) {
                 if (future.isDone()) {
