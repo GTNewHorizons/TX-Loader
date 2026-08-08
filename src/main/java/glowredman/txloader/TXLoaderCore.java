@@ -23,6 +23,7 @@ import cpw.mods.fml.relauncher.IFMLLoadingPlugin.MCVersion;
 import cpw.mods.fml.relauncher.IFMLLoadingPlugin.Name;
 import cpw.mods.fml.relauncher.IFMLLoadingPlugin.SortingIndex;
 import cpw.mods.fml.relauncher.IFMLLoadingPlugin.TransformerExclusions;
+import glowredman.txloader.RemoteHandler.JVersionManifest;
 
 @Name("TX Loader Core")
 @TransformerExclusions({ "glowredman.txloader.TXLoaderCore", "glowredman.txloader.MinecraftClassTransformer" })
@@ -90,6 +91,7 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
         }
 
         if (JarHandler.initCache()) {
+            RemoteHandler.versionsStage.complete(JVersionManifest.DUMMY);
             return;
         }
 

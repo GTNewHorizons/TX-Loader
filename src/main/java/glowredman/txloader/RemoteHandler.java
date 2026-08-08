@@ -60,9 +60,7 @@ class RemoteHandler {
         }
 
         if (manifest == null) {
-            manifest = new JVersionManifest();
-            manifest.urls = Collections.emptyMap();
-            return manifest;
+            return JVersionManifest.DUMMY;
         }
 
         Map<String, String> urls = new ConcurrentHashMap<>(manifest.versions.size(), 1.0f);
@@ -304,8 +302,16 @@ class RemoteHandler {
 
     static class JVersionManifest {
 
+        static final JVersionManifest DUMMY;
+
         List<JVersion> versions;
         transient Map<String, String> urls; // ignored by GSON
+
+        static {
+            DUMMY = new JVersionManifest();
+            DUMMY.versions = Collections.emptyList();
+            DUMMY.urls = Collections.emptyMap();
+        }
     }
 
     static class JVersion {
