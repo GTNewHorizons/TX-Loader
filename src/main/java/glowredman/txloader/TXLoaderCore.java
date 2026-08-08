@@ -84,7 +84,12 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
             return;
         }
 
-        if (FMLLaunchHandler.side().isServer() || JarHandler.initCache()) {
+        if (FMLLaunchHandler.side().isServer()) {
+            ServerLangHelper.load();
+            return;
+        }
+
+        if (JarHandler.initCache()) {
             return;
         }
 

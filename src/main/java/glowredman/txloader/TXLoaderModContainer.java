@@ -57,8 +57,6 @@ public class TXLoaderModContainer extends DummyModContainer {
     public void serverStarting(FMLServerStartingEvent event) {
         if (event.getSide().isClient()) {
             ClientCommandHandler.instance.registerCommand(new CommandTX());
-        } else {
-            ServerLangHelper.load();
         }
     }
 }
