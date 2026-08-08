@@ -113,7 +113,8 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
 
     /**
      *
-     * @deprecated {@link #getAssetBuilder(String, String)} should be used instead.
+     * @deprecated {@link #getAssetBuilder(String, String)} should be used instead. This method exists for backwards
+     *             compatibility. It assumes version 26.2 as "latest" version.
      * @param resourceLocation The ResourceLocation used to identify the asset on Mojang's side. Example:
      *                         <code>minecraft/lang/en_us.lang</code>
      * @return An {@link AssetBuilder} object to specify further properties
