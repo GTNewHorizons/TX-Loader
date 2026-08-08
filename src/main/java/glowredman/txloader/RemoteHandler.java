@@ -34,7 +34,7 @@ class RemoteHandler {
     private static final Map<String, CompletableFuture<JVersionDetails>> DETAILS = new ConcurrentHashMap<>();
     private static final Map<String, CompletableFuture<Map<String, JAsset>>> ASSET_INDICES = new ConcurrentHashMap<>();
     static final Set<CompletableFuture<Void>> BLOCKING_FUTURES = new HashSet<>();
-    private static final Set<Path> PATHS = new HashSet<>();
+    private static final Set<Path> PATHS = ConcurrentHashMap.newKeySet();
 
     static JVersionManifest fetchVersions() {
         Path path = JarHandler.txloaderCache.resolve("version_manifest.json");
@@ -79,7 +79,7 @@ class RemoteHandler {
         String version = asset.getVersion();
         Source source = asset.getSource();
 
-        if (PATHS.contains(path)) {
+        if (!PATHS.add(path)) {
             TXLoaderCore.LOGGER.warn(
                     "Duplicate asset defined for {}, skipping {} on version {} for source {}",
                     asset.getResourceLocation(),
@@ -88,8 +88,6 @@ class RemoteHandler {
                     source);
             return CompletableFuture.completedFuture(null);
         }
-
-        PATHS.add(path);
 
         if (Files.exists(path)) {
             return CompletableFuture.completedFuture(null);
