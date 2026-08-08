@@ -149,7 +149,7 @@ class RemoteHandler {
             try {
                 return TXLoaderCore.GSON.fromJson(Files.newBufferedReader(path), JVersionDetails.class);
             } catch (Exception e) {
-                TXLoaderCore.LOGGER.error("Failed to get version details for version {}", e);
+                TXLoaderCore.LOGGER.error("Failed to get version details for version {}", version, e);
                 return null;
             }
         }, TXLoaderCore.EXECUTOR_NET);
@@ -237,7 +237,7 @@ class RemoteHandler {
                 Files.copy(is, targetPath);
             }
         } catch (Exception e) {
-            TXLoaderCore.LOGGER.error("Failed to extract asset from jar! Path: {}", asset.resourceLocation, e);
+            TXLoaderCore.LOGGER.error("Failed to extract asset from JAR! Path: {}", asset.resourceLocation, e);
             return;
         }
 

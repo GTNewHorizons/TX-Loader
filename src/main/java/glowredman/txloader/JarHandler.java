@@ -93,7 +93,7 @@ class JarHandler {
                 txloaderCache = Paths.get(userHome, ".cache", "txloader");
             }
             TXLoaderCore.LOGGER.warn(
-                    "An error occurred while the TXLoader cache path was created. The environment variable TEMP or LOCALAPPDATA could be set incorrectly.",
+                    "An error occurred while the TXLoader cache path was created. The environment variable TEMP or LOCALAPPDATA could be set incorrectly. Using the default cache location: {}",
                     txloaderCache,
                     e);
         }
