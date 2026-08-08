@@ -255,15 +255,14 @@ class RemoteHandler {
 
     private static void download(String url, Path path) throws IOException {
         TXLoaderCore.LOGGER.info("Downloading {} to {}", url, path);
-        Path temp = Files.createTempFile(path.getParent(), path.getFileName().toString(), null);
+        Path temp = Files.createTempFile(path.getParent(), null, null);
         URLConnection connection = new URL(url).openConnection();
         connection.setConnectTimeout(CONNECT_TIMEOUT);
         connection.setReadTimeout(READ_TIMEOUT);
         try (InputStream is = connection.getInputStream()) {
             Files.copy(is, temp, StandardCopyOption.REPLACE_EXISTING);
         }
-        Files.move(path, temp, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-        Files.deleteIfExists(temp);
+        Files.move(temp, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
     }
 
     private static <T> void resetOnFailure(Map<String, CompletableFuture<T>> map, String key, T result) {
