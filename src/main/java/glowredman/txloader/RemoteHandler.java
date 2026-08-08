@@ -104,7 +104,11 @@ class RemoteHandler {
                     .thenAcceptAsync(
                             assetIndex -> fetchDirect(assetIndex, asset, path, version),
                             TXLoaderCore.EXECUTOR_NET);
-            BLOCKING_FUTURES.add(future);
+
+            synchronized (BLOCKING_FUTURES) {
+                BLOCKING_FUTURES.add(future);
+            }
+
             return future;
         }
 
@@ -117,7 +121,11 @@ class RemoteHandler {
                                 details -> verifyJarExists(details, v, isClient),
                                 TXLoaderCore.EXECUTOR_NET))
                 .thenAcceptAsync(jarPath -> fetchFromJar(asset, jarPath, path), TXLoaderCore.EXECUTOR_IO);
-        BLOCKING_FUTURES.add(future);
+
+        synchronized (BLOCKING_FUTURES) {
+            BLOCKING_FUTURES.add(future);
+        }
+
         return future;
     }
 
