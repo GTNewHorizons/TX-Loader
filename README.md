@@ -34,3 +34,10 @@ TX Loader
   }
 ]
 ```
+
+### TODO
+- Allow some assets to be downloaded server-side too (maybe introduce a new flag in `Asset` for it)
+- Clean up `RemoteHandler`
+- Let config-driven assets override mod-driven assets (right now it's the other way around)
+  - Clarify: should mods even be allowed to defined force-loaded assets?
+- Improve error message if `/tx` command has wrong number of arguments
