@@ -213,6 +213,7 @@ class RemoteHandler {
             jAsset.download(path);
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed to get asset! Path: {}", asset.resourceLocation, e);
+            return;
         }
 
         TXLoaderCore.LOGGER.debug("Successfully fetched {}", asset.resourceLocation);
