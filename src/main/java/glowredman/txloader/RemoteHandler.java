@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
 import javax.annotation.Nonnull;
@@ -220,10 +221,19 @@ class RemoteHandler {
             return;
         }
 
-        try (JarFile jarFile = new JarFile(jarPath.toFile());
-                InputStream is = jarFile.getInputStream(jarFile.getJarEntry("assets/" + asset.resourceLocation))) {
+        try (JarFile jarFile = new JarFile(jarPath.toFile())) {
+            JarEntry jarEntry = jarFile.getJarEntry("assets/" + asset.resourceLocation);
+
+            if (jarEntry == null) {
+                TXLoaderCore.LOGGER
+                        .error("Failed to find asset {} in JAR ({}), skipping!", asset.resourceLocation, jarPath);
+                return;
+            }
+
             Files.createDirectories(targetPath.getParent());
-            Files.copy(is, targetPath);
+            try (InputStream is = jarFile.getInputStream(jarEntry)) {
+                Files.copy(is, targetPath);
+            }
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed to extract asset from jar! Path: {}", asset.resourceLocation, e);
             return;
