@@ -5,6 +5,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.IResourcePack;
@@ -14,6 +15,7 @@ import net.minecraft.client.resources.ResourcePackRepository.Entry;
 public class MinecraftHook {
 
     private static final Map<String, int[]> bootResourceChecks = new HashMap<>();
+    private static final AtomicInteger bootIndexedResourceChecks = new AtomicInteger();
     private static volatile boolean loadComplete;
     private static volatile boolean bootProfileLogged;
 
@@ -34,7 +36,11 @@ public class MinecraftHook {
         return resourcePackList;
     }
 
-    static synchronized void recordResourceCheck(String pack, String resource, boolean exists) {
+    static void recordIndexedResourceCheck() {
+        if (!bootProfileLogged) bootIndexedResourceChecks.incrementAndGet();
+    }
+
+    static synchronized void recordFileExistsCheck(String pack, String resource, boolean exists) {
         if (bootProfileLogged) return;
         bootResourceChecks.computeIfAbsent(pack + ": " + resource, ignored -> new int[2])[exists ? 0 : 1]++;
     }
@@ -62,9 +68,14 @@ public class MinecraftHook {
             }
         }
 
+        int indexed = bootIndexedResourceChecks.get();
         TXLoaderCore.LOGGER.info(
-                "Pack boot File.exists checks: {} total, {} unique, {} duplicate across {} paths, {} hits, {} misses",
-                total,
+                "Pack boot TX resource checks: {} total, {} indexed, {} File.exists fallbacks",
+                indexed + total,
+                indexed,
+                total);
+        TXLoaderCore.LOGGER.info(
+                "File.exists fallbacks: {} unique, {} duplicate across {} paths, {} hits, {} misses",
                 bootResourceChecks.size(),
                 total - bootResourceChecks.size(),
                 repeatedPaths,

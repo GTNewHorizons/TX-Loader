@@ -4,6 +4,7 @@ import java.awt.image.BufferedImage;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.FileVisitOption;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
@@ -20,6 +21,7 @@ public class TXResourcePack implements IResourcePack {
 
     private final String name;
     private final Path dir;
+    private volatile Set<Path> resources;
 
     public TXResourcePack(String name, Path dir) {
         this.name = name;
@@ -34,9 +36,15 @@ public class TXResourcePack implements IResourcePack {
     @Override
     public boolean resourceExists(ResourceLocation rl) {
         try {
-            Path resource = getResourcePath(rl);
+            Path resource = getResourcePath(rl).normalize();
+            Set<Path> indexedResources = resources;
+            if (indexedResources != null) {
+                MinecraftHook.recordIndexedResourceCheck();
+                return indexedResources.contains(resource);
+            }
+
             boolean exists = resource.toFile().exists();
-            MinecraftHook.recordResourceCheck(name, dir.relativize(resource.normalize()).toString(), exists);
+            MinecraftHook.recordFileExistsCheck(name, dir.relativize(resource).toString(), exists);
             return exists;
         } catch (InvalidPathException e) {
             /*
@@ -55,6 +63,7 @@ public class TXResourcePack implements IResourcePack {
         if (TXLoaderCore.isRemoteReachable) {
             RemoteHandler.getAssets();
         }
+        indexResources();
 
         Set<String> resourceDomains = new HashSet<>();
         try (Stream<Path> dirs = Files.list(this.dir).filter(Files::isDirectory)) {
@@ -63,6 +72,17 @@ public class TXResourcePack implements IResourcePack {
             TXLoaderCore.LOGGER.error("Failed to get resource domains of directory {}", this.dir, e);
         }
         return resourceDomains;
+    }
+
+    private void indexResources() {
+        Set<Path> indexedResources = new HashSet<>();
+        try (Stream<Path> paths = Files.walk(this.dir, FileVisitOption.FOLLOW_LINKS)) {
+            paths.filter(Files::exists).map(Path::normalize).forEach(indexedResources::add);
+            resources = indexedResources;
+        } catch (Exception e) {
+            resources = null;
+            TXLoaderCore.LOGGER.error("Failed to index resources of directory {}", this.dir, e);
+        }
     }
 
     @Override
