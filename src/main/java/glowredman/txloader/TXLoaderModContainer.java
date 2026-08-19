@@ -11,6 +11,7 @@ import cpw.mods.fml.common.LoadController;
 import cpw.mods.fml.common.Loader;
 import cpw.mods.fml.common.MetadataCollection;
 import cpw.mods.fml.common.ModMetadata;
+import cpw.mods.fml.common.event.FMLLoadCompleteEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartingEvent;
 import cpw.mods.fml.common.versioning.VersionParser;
@@ -57,6 +58,11 @@ public class TXLoaderModContainer extends DummyModContainer {
     @Subscribe
     public void preInit(FMLPreInitializationEvent event) {
         ProgressBarProxy.isBLSLoaded = Loader.isModLoaded("betterloadingscreen");
+    }
+
+    @Subscribe
+    public void loadComplete(FMLLoadCompleteEvent event) {
+        MinecraftHook.onLoadComplete();
     }
 
     @Subscribe

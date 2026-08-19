@@ -42,6 +42,14 @@ public class MinecraftClassTransformer implements IClassTransformer {
                                         "insertPacks",
                                         "(Ljava/util/List;)Ljava/util/List;",
                                         false));
+                        mn.instructions.insert(
+                                node,
+                                new MethodInsnNode(
+                                        Opcodes.INVOKESTATIC,
+                                        "glowredman/txloader/MinecraftHook",
+                                        "finishResourceReload",
+                                        "()V",
+                                        false));
                         success = true;
                         break;
                     }

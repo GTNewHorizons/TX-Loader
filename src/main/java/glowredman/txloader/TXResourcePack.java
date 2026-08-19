@@ -34,7 +34,10 @@ public class TXResourcePack implements IResourcePack {
     @Override
     public boolean resourceExists(ResourceLocation rl) {
         try {
-            return getResourcePath(rl).toFile().exists();
+            Path resource = getResourcePath(rl);
+            boolean exists = resource.toFile().exists();
+            MinecraftHook.recordResourceCheck(name, dir.relativize(resource.normalize()).toString(), exists);
+            return exists;
         } catch (InvalidPathException e) {
             /*
              * Some mods load resources dynamically by id. (example: java.nio.file.InvalidPathException: Illegal char
