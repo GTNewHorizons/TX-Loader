@@ -38,14 +38,9 @@ public class TXResourcePack implements IResourcePack {
         try {
             Path resource = getResourcePath(rl).normalize();
             Set<Path> indexedResources = resources;
-            if (indexedResources != null) {
-                MinecraftHook.recordIndexedResourceCheck();
-                return indexedResources.contains(resource);
-            }
+            if (indexedResources != null) return indexedResources.contains(resource);
 
-            boolean exists = resource.toFile().exists();
-            MinecraftHook.recordFileExistsCheck(name, dir.relativize(resource).toString(), exists);
-            return exists;
+            return resource.toFile().exists();
         } catch (InvalidPathException e) {
             /*
              * Some mods load resources dynamically by id. (example: java.nio.file.InvalidPathException: Illegal char
@@ -77,7 +72,7 @@ public class TXResourcePack implements IResourcePack {
     private void indexResources() {
         Set<Path> indexedResources = new HashSet<>();
         try (Stream<Path> paths = Files.walk(this.dir, FileVisitOption.FOLLOW_LINKS)) {
-            paths.filter(Files::exists).map(Path::normalize).forEach(indexedResources::add);
+            paths.map(Path::normalize).forEach(indexedResources::add);
             resources = indexedResources;
         } catch (Exception e) {
             resources = null;
