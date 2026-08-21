@@ -21,7 +21,7 @@ public class TXResourcePack implements IResourcePack {
 
     private final String name;
     private final Path dir;
-    private volatile Set<Path> resources;
+    private volatile Set<ResourceLocation> resources;
 
     public TXResourcePack(String name, Path dir) {
         this.name = name;
@@ -36,11 +36,10 @@ public class TXResourcePack implements IResourcePack {
     @Override
     public boolean resourceExists(ResourceLocation rl) {
         try {
-            Path resource = getResourcePath(rl).normalize();
-            Set<Path> indexedResources = resources;
-            if (indexedResources != null) return indexedResources.contains(resource);
+            Set<ResourceLocation> indexedResources = resources;
+            if (indexedResources != null) return indexedResources.contains(rl);
 
-            return resource.toFile().exists();
+            return getResourcePath(rl).toFile().exists();
         } catch (InvalidPathException e) {
             /*
              * Some mods load resources dynamically by id. (example: java.nio.file.InvalidPathException: Illegal char
@@ -70,9 +69,21 @@ public class TXResourcePack implements IResourcePack {
     }
 
     private void indexResources() {
-        Set<Path> indexedResources = new HashSet<>();
+        Set<ResourceLocation> indexedResources = new HashSet<>();
+        String separator = this.dir.getFileSystem().getSeparator();
+        int rootLength = this.dir.toString().length() + separator.length();
+        boolean replaceSeparator = !separator.equals("/");
         try (Stream<Path> paths = Files.walk(this.dir, FileVisitOption.FOLLOW_LINKS)) {
-            paths.map(Path::normalize).forEach(indexedResources::add);
+            paths.skip(1).forEach(path -> {
+                String pathString = path.toString();
+                int separatorIndex = pathString.indexOf(separator, rootLength);
+                if (separatorIndex < 0) return; // skipping domain paths, can't build a RL with it
+
+                String resourcePath = pathString.substring(separatorIndex + separator.length());
+                if (replaceSeparator) resourcePath = resourcePath.replace(separator, "/");
+                indexedResources
+                        .add(new ResourceLocation(pathString.substring(rootLength, separatorIndex), resourcePath));
+            });
             resources = indexedResources;
         } catch (Exception e) {
             resources = null;

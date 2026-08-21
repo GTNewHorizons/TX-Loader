@@ -11,7 +11,7 @@ public class MinecraftHook {
 
     public static List<IResourcePack> insertPacks(List<IResourcePack> resourcePackList) {
         List<Entry> assignedPacks = Minecraft.getMinecraft().getResourcePackRepository().getRepositoryEntries();
-        TXResourcePack pack = new TXResourcePack("TX Loader Resources", TXLoaderCore.resourcesDir);
+        IResourcePack pack = new TXResourcePack("TX Loader Resources", TXLoaderCore.resourcesDir);
 
         if (assignedPacks.isEmpty()) {
             resourcePackList.add(pack);
@@ -21,8 +21,7 @@ public class MinecraftHook {
             resourcePackList.add(index, pack);
         }
 
-        TXResourcePack forcedPack = new TXResourcePack("TX Loader Forced Resources", TXLoaderCore.forceResourcesDir);
-        resourcePackList.add(forcedPack);
+        resourcePackList.add(new TXResourcePack("TX Loader Forced Resources", TXLoaderCore.forceResourcesDir));
         return resourcePackList;
     }
 }
