@@ -1,5 +1,6 @@
 package glowredman.txloader;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
@@ -50,8 +51,8 @@ class RemoteHandler {
         JVersionManifest manifest = null;
 
         if (Files.exists(path)) {
-            try {
-                manifest = TXLoaderCore.GSON.fromJson(Files.newBufferedReader(path), JVersionManifest.class);
+            try (BufferedReader reader = Files.newBufferedReader(path)) {
+                manifest = TXLoaderCore.GSON.fromJson(reader, JVersionManifest.class);
             } catch (Exception e) {
                 TXLoaderCore.LOGGER.error("Manifest file could not be parsed!", e);
             }
@@ -154,8 +155,8 @@ class RemoteHandler {
                 }
             }
 
-            try {
-                return TXLoaderCore.GSON.fromJson(Files.newBufferedReader(path), JVersionDetails.class);
+            try (BufferedReader reader = Files.newBufferedReader(path)) {
+                return TXLoaderCore.GSON.fromJson(reader, JVersionDetails.class);
             } catch (Exception e) {
                 TXLoaderCore.LOGGER.error("Failed to get version details for version {}", version, e);
                 return null;
@@ -179,8 +180,8 @@ class RemoteHandler {
             }
         }
 
-        try {
-            return TXLoaderCore.GSON.fromJson(Files.newBufferedReader(path), JAssetIndex.class).objects;
+        try (BufferedReader reader = Files.newBufferedReader(path)) {
+            return TXLoaderCore.GSON.fromJson(reader, JAssetIndex.class).objects;
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed to get asset index for version {}!", version, e);
             return null;
