@@ -14,6 +14,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
@@ -38,13 +39,15 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
             512,
             10,
             TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>());
+            new LinkedBlockingQueue<>(),
+            new ThreadFactoryBuilder().setNameFormat("TX Loader IO #%d").setDaemon(true).build());
     static final Executor EXECUTOR_NET = new ThreadPoolExecutor(
             32,
             32,
             10,
             TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>());
+            new LinkedBlockingQueue<>(),
+            new ThreadFactoryBuilder().setNameFormat("TX Loader NET #%d").setDaemon(true).build());
     static File modFile;
     static Path mcLocation;
     static Path configDir;
