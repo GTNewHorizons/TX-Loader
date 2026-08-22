@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -263,7 +264,12 @@ class RemoteHandler {
         try (InputStream is = connection.getInputStream()) {
             Files.copy(is, temp, StandardCopyOption.REPLACE_EXISTING);
         }
-        Files.move(temp, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        try {
+            Files.move(temp, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (AtomicMoveNotSupportedException ignored) {
+            // try again, without ATOMIC_MOVE
+            Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 
     private static <T> void resetOnFailure(Map<String, CompletableFuture<T>> map, String key, T result) {
