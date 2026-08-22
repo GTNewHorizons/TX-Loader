@@ -59,9 +59,6 @@ public class TXResourcePack implements IResourcePack {
     @Override
     public Set<String> getResourceDomains() {
         RemoteHandler.ensureNoBlocking();
-        if (TXLoaderCore.isRemoteReachable) {
-            RemoteHandler.getAssets();
-        }
         this.indexResources();
 
         Set<String> resourceDomains = new HashSet<>();
@@ -89,9 +86,9 @@ public class TXResourcePack implements IResourcePack {
                 indexedResources
                         .add(new ResourceLocation(pathString.substring(rootLength, separatorIndex), resourcePath));
             });
-            resources = indexedResources;
+            this.resources = indexedResources;
         } catch (Exception e) {
-            resources = null;
+            this.resources = null;
             TXLoaderCore.LOGGER.error("Failed to index resources of directory {}", this.dir, e);
         }
     }
