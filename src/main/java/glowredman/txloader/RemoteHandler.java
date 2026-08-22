@@ -22,6 +22,8 @@ import java.util.jar.JarFile;
 import javax.annotation.Nonnull;
 
 import glowredman.txloader.Asset.Source;
+import glowredman.txloader.progress.ProgressBar;
+import glowredman.txloader.progress.ProgressBarProxy;
 
 class RemoteHandler {
 
@@ -291,6 +293,9 @@ class RemoteHandler {
      * Ensures that all futures are completed
      */
     static void ensureNoBlocking() {
+        ProgressBar bar = ProgressBarProxy.get("Awaiting blocking Tasks", 2);
+        bar.step("Startup Tasks");
+
         // copying old ResourceLoader files, fetching version manifest, loading config
         try {
             versionsStage.join();
@@ -300,6 +305,7 @@ class RemoteHandler {
 
         // fetch assets (directly or from JARs), this implicitly includes downloads of version details, asset indices
         // and JARs
+        bar.step("Fetching Assets");
         synchronized (BLOCKING_FUTURES) {
             for (CompletableFuture<Void> future : BLOCKING_FUTURES) {
                 if (future.isDone()) {
@@ -313,6 +319,8 @@ class RemoteHandler {
             }
             BLOCKING_FUTURES.clear();
         }
+
+        bar.pop();
     }
 
     private static class FutureWrapper<T> {
