@@ -216,6 +216,10 @@ class RemoteHandler {
     }
 
     private static void fetchDirect(Map<String, JAsset> assets, Asset asset, Path path, String version) {
+        if (assets == null) {
+            return;
+        }
+
         JAsset jAsset = assets.get(asset.resourceLocation);
 
         if (jAsset == null) {
