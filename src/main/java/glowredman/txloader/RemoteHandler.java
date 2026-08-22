@@ -93,19 +93,21 @@ class RemoteHandler {
             return CompletableFuture.completedFuture(null);
         }
 
+        FutureWrapper<JVersionDetails> detailsWrapper = new FutureWrapper<>();
         CompletableFuture<JVersionDetails> detailsStage = DETAILS
                 .computeIfAbsent(version, RemoteHandler::verifyDetailsExist)
-                .whenComplete((details, t) -> resetOnFailure(DETAILS, version, details));
+                .whenComplete((details, t) -> resetOnFailure(DETAILS, detailsWrapper, version, details));
+        detailsWrapper.reference = detailsStage;
 
         if (source == Source.ASSET) {
-            CompletableFuture<Void> future = ASSET_INDICES.computeIfAbsent(
-                    version,
-                    v -> detailsStage
-                            .thenApplyAsync(details -> verifyAssetIndexExists(v, details), TXLoaderCore.EXECUTOR_NET)
-                            .whenComplete((index, t) -> resetOnFailure(ASSET_INDICES, v, index)))
-                    .thenAcceptAsync(
-                            assetIndex -> fetchDirect(assetIndex, asset, path, version),
-                            TXLoaderCore.EXECUTOR_NET);
+            CompletableFuture<Void> future = ASSET_INDICES.computeIfAbsent(version, v -> {
+                FutureWrapper<Map<String, JAsset>> assetIndexWrapper = new FutureWrapper<>();
+                CompletableFuture<Map<String, JAsset>> assetIndexStage = detailsStage
+                        .thenApplyAsync(details -> verifyAssetIndexExists(v, details), TXLoaderCore.EXECUTOR_NET)
+                        .whenComplete((index, t) -> resetOnFailure(ASSET_INDICES, assetIndexWrapper, v, index));
+                assetIndexWrapper.reference = assetIndexStage;
+                return assetIndexStage;
+            }).thenAcceptAsync(assetIndex -> fetchDirect(assetIndex, asset, path, version), TXLoaderCore.EXECUTOR_NET);
 
             synchronized (BLOCKING_FUTURES) {
                 BLOCKING_FUTURES.add(future);
@@ -119,12 +121,14 @@ class RemoteHandler {
 
         Map<String, CompletableFuture<Path>> cachedJars = isClient ? JarHandler.CACHED_CLIENT_JARS
                 : JarHandler.CACHED_SERVER_JARS;
-        CompletableFuture<Void> future = cachedJars.computeIfAbsent(
-                version,
-                v -> detailsStage
-                        .thenApplyAsync(details -> verifyJarExists(details, v, isClient), TXLoaderCore.EXECUTOR_NET)
-                        .whenComplete((jarPath, t) -> resetOnFailure(cachedJars, v, jarPath)))
-                .thenAcceptAsync(jarPath -> fetchFromJar(asset, jarPath, path), TXLoaderCore.EXECUTOR_IO);
+        CompletableFuture<Void> future = cachedJars.computeIfAbsent(version, v -> {
+            FutureWrapper<Path> jarWrapper = new FutureWrapper<>();
+            CompletableFuture<Path> jarStage = detailsStage
+                    .thenApplyAsync(details -> verifyJarExists(details, v, isClient), TXLoaderCore.EXECUTOR_NET)
+                    .whenComplete((jarPath, t) -> resetOnFailure(cachedJars, jarWrapper, v, jarPath));
+            jarWrapper.reference = jarStage;
+            return jarStage;
+        }).thenAcceptAsync(jarPath -> fetchFromJar(asset, jarPath, path), TXLoaderCore.EXECUTOR_IO);
 
         synchronized (BLOCKING_FUTURES) {
             BLOCKING_FUTURES.add(future);
@@ -272,9 +276,10 @@ class RemoteHandler {
         }
     }
 
-    private static <T> void resetOnFailure(Map<String, CompletableFuture<T>> map, String key, T result) {
+    private static <T> void resetOnFailure(Map<String, CompletableFuture<T>> map, FutureWrapper<T> wrapper, String key,
+            T result) {
         if (result == null) {
-            map.remove(key);
+            map.remove(key, wrapper.reference);
         }
     }
 
@@ -304,6 +309,12 @@ class RemoteHandler {
             }
             BLOCKING_FUTURES.clear();
         }
+    }
+
+    private static class FutureWrapper<T> {
+
+        CompletableFuture<T> reference;
+
     }
 
     /*
