@@ -27,8 +27,8 @@ class RemoteHandler {
 
     private static final String MANIFEST_URL = "https://launchermeta.mojang.com/mc/game/version_manifest.json";
     private static final String RESOURCES_URL = "https://resources.download.minecraft.net/";
-    private static final int CONNECT_TIMEOUT = 5000;
-    private static final int READ_TIMEOUT = 10000;
+    private static final int CONNECT_TIMEOUT = Integer.getInteger("txloader.timeout.connect", 5000);
+    private static final int READ_TIMEOUT = Integer.getInteger("txloader.timeout.read", 10000);
 
     static final CompletableFuture<JVersionManifest> VERSIONS_STAGE = new CompletableFuture<>();
     static final CompletableFuture<Void> LOAD_STAGE = new CompletableFuture<>();

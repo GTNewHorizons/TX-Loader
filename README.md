@@ -35,6 +35,17 @@ TX Loader
 ]
 ```
 
+### JVM Arguments
+|Name|Default Value|Description|
+|:---|:---|:---|
+|`-Dtxloader.keepalive.io`|10000|How long (in milliseconds) idle file IO threads are kept alive before being terminated|
+|`-Dtxloader.keepalive.net`|10000|How long (in milliseconds) idle network threads are kept alive before being terminated|
+|`-Dtxloader.poolsize.io`|32|Maximum number of file IO threads|
+|`-Dtxloader.poolsize.net`|16|Maximum number of network threads|
+|`-Dtxloader.timeout.connect`|5000|How long (in milliseconds) establishing a connection to a remote resource is attempted|
+|`-Dtxloader.timeout.read`|10000|How long (in milliseconds) beginning to read data from a remote resource is allowed to take before the connection is terminated|
+
+
 ### TODO
 - Allow some assets to be downloaded server-side too (maybe introduce a new flag in `Asset` for it)
 - Clean up `RemoteHandler`
