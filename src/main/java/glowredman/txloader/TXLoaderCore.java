@@ -85,30 +85,34 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
             Files.createDirectories(forceResourcesDir);
         } catch (IOException e) {
             LOGGER.error("Failed to create resource directories!", e);
+            RemoteHandler.VERSIONS_STAGE.complete(JVersionManifest.DUMMY);
             return;
         }
 
         if (FMLLaunchHandler.side().isServer()) {
+            RemoteHandler.VERSIONS_STAGE.complete(JVersionManifest.DUMMY);
             ServerLangHelper.load();
             return;
         }
 
         if (JarHandler.initCache()) {
-            RemoteHandler.versionsStage.complete(JVersionManifest.DUMMY);
+            RemoteHandler.VERSIONS_STAGE.complete(JVersionManifest.DUMMY);
             return;
         }
 
         ((ThreadPoolExecutor) EXECUTOR_IO).allowCoreThreadTimeOut(true);
         ((ThreadPoolExecutor) EXECUTOR_NET).allowCoreThreadTimeOut(true);
 
-        RemoteHandler.versionsStage = CompletableFuture.runAsync(ConfigHandler::moveRLAssets, EXECUTOR_IO)
-                .thenCombineAsync(
+        CompletableFuture.runAsync(ConfigHandler::moveRLAssets, EXECUTOR_IO)
+                .thenAcceptBothAsync(
                         CompletableFuture.supplyAsync(RemoteHandler::fetchVersions, EXECUTOR_NET),
                         (void_, manifest) -> {
+                            RemoteHandler.VERSIONS_STAGE.complete(manifest);
                             ConfigHandler.load();
-                            return manifest;
                         },
-                        EXECUTOR_IO);
+                        EXECUTOR_IO)
+                // ensure that VERSIONS_STAGE is completed no matter what
+                .whenComplete((void_, t) -> RemoteHandler.VERSIONS_STAGE.complete(JVersionManifest.DUMMY));
     }
 
     @Override

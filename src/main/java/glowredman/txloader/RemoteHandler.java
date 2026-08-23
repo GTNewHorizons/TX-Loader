@@ -32,9 +32,7 @@ class RemoteHandler {
     private static final int CONNECT_TIMEOUT = 5000;
     private static final int READ_TIMEOUT = 10000;
 
-    // dummy value, prevents NPEs
-    static volatile CompletableFuture<JVersionManifest> versionsStage = new CompletableFuture<>();
-
+    static final CompletableFuture<JVersionManifest> VERSIONS_STAGE = new CompletableFuture<>();
     private static final Map<String, CompletableFuture<JVersionDetails>> DETAILS = new ConcurrentHashMap<>();
     private static final Map<String, CompletableFuture<Map<String, JAsset>>> ASSET_INDICES = new ConcurrentHashMap<>();
     static final Set<CompletableFuture<Void>> BLOCKING_FUTURES = new HashSet<>();
@@ -140,7 +138,7 @@ class RemoteHandler {
     }
 
     private static CompletableFuture<JVersionDetails> verifyDetailsExist(String version) {
-        return versionsStage.thenApplyAsync(manifest -> {
+        return VERSIONS_STAGE.thenApplyAsync(manifest -> {
             Path path = JarHandler.versions.resolve(version + ".json");
 
             if (Files.notExists(path)) {
@@ -298,7 +296,7 @@ class RemoteHandler {
 
         // copying old ResourceLoader files, fetching version manifest, loading config
         try {
-            versionsStage.join();
+            VERSIONS_STAGE.join();
         } catch (Exception e) {
             TXLoaderCore.LOGGER.warn("A future completed exceptionally!", e);
         }

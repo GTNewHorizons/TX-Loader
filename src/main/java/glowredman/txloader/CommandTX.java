@@ -206,7 +206,7 @@ class CommandTX implements ICommand {
             return this.versions;
         }
 
-        if (!RemoteHandler.versionsStage.isDone()) {
+        if (!RemoteHandler.VERSIONS_STAGE.isDone()) {
             // list can't be constructed yet, exit early
             return Collections.emptyList();
         }
@@ -214,7 +214,7 @@ class CommandTX implements ICommand {
         JVersionManifest manifest;
 
         try {
-            manifest = RemoteHandler.versionsStage.join();
+            manifest = RemoteHandler.VERSIONS_STAGE.join();
         } catch (Exception e) {
             // the future didn't complete normally, assign an empty list (to exit early in the future) and return it
             TXLoaderCore.LOGGER
