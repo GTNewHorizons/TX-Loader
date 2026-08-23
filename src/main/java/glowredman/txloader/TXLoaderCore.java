@@ -34,25 +34,36 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
 
     static final Logger LOGGER = LogManager.getLogger("TX Loader");
     static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    static final Executor EXECUTOR_IO = new ThreadPoolExecutor(
-            512,
-            512,
-            10,
-            TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>(),
-            new ThreadFactoryBuilder().setNameFormat("TX Loader IO #%d").setDaemon(true).build());
-    static final Executor EXECUTOR_NET = new ThreadPoolExecutor(
-            32,
-            32,
-            10,
-            TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>(),
-            new ThreadFactoryBuilder().setNameFormat("TX Loader NET #%d").setDaemon(true).build());
+    static final Executor EXECUTOR_IO;
+    static final Executor EXECUTOR_NET;
     static File modFile;
     static Path mcLocation;
     static Path configDir;
     static Path resourcesDir;
     static Path forceResourcesDir;
+
+    static {
+        int poolSizeIO = Integer.getInteger("txloader.poolsize.io", 32);
+        int poolSizeNet = Integer.getInteger("txloader.poolsize.net", 16);
+        long keepAliveIO = Long.getLong("txloader.keepalive.io", 10000);
+        long keepAliveNet = Long.getLong("txloader.keepalive.net", 10000);
+
+        EXECUTOR_IO = new ThreadPoolExecutor(
+                poolSizeIO,
+                poolSizeIO,
+                keepAliveIO,
+                TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>(),
+                new ThreadFactoryBuilder().setNameFormat("TX Loader IO #%d").setDaemon(true).build());
+
+        EXECUTOR_NET = new ThreadPoolExecutor(
+                poolSizeNet,
+                poolSizeNet,
+                keepAliveNet,
+                TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>(),
+                new ThreadFactoryBuilder().setNameFormat("TX Loader NET #%d").setDaemon(true).build());
+    }
 
     @Override
     public String[] getASMTransformerClass() {
