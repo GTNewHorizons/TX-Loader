@@ -1,3 +1,1 @@
-dependencies {
-    compileOnly("com.github.GTNewHorizons:BetterLoadingScreen:1.7.6-GTNH:dev") { transitive = false }
-}
+dependencies {}

@@ -22,8 +22,6 @@ import java.util.jar.JarFile;
 import javax.annotation.Nonnull;
 
 import glowredman.txloader.Asset.Source;
-import glowredman.txloader.progress.ProgressBar;
-import glowredman.txloader.progress.ProgressBarProxy;
 
 class RemoteHandler {
 
@@ -291,19 +289,25 @@ class RemoteHandler {
      * Ensures that all futures are completed
      */
     static void ensureNoBlocking() {
-        ProgressBar bar = ProgressBarProxy.get("Awaiting blocking Tasks", 2);
-        bar.step("Startup Tasks");
+        // early exit
+        synchronized (BLOCKING_FUTURES) {
+            if (VERSIONS_STAGE.isDone() && BLOCKING_FUTURES.isEmpty()) {
+                return;
+            }
+        }
 
         // copying old ResourceLoader files, fetching version manifest, loading config
-        try {
-            VERSIONS_STAGE.join();
-        } catch (Exception e) {
-            TXLoaderCore.LOGGER.warn("A future completed exceptionally!", e);
+        if (!VERSIONS_STAGE.isDone()) {
+            TXLoaderCore.LOGGER.info("Awaiting startup tasks...");
+            try {
+                VERSIONS_STAGE.join();
+            } catch (Exception e) {
+                TXLoaderCore.LOGGER.warn("A future completed exceptionally!", e);
+            }
         }
 
         // fetch assets (directly or from JARs), this implicitly includes downloads of version details, asset indices
         // and JARs
-        bar.step("Fetching Assets");
         while (true) {
             Set<CompletableFuture<Void>> snapshot;
             synchronized (BLOCKING_FUTURES) {
@@ -313,6 +317,9 @@ class RemoteHandler {
                 snapshot = new HashSet<>(BLOCKING_FUTURES);
                 BLOCKING_FUTURES.clear();
             }
+
+            TXLoaderCore.LOGGER.info("Awaiting {} assets...", snapshot.size());
+
             for (CompletableFuture<Void> future : snapshot) {
                 try {
                     future.join();
@@ -322,7 +329,7 @@ class RemoteHandler {
             }
         }
 
-        bar.pop();
+        TXLoaderCore.LOGGER.info("Done!");
     }
 
     private static class FutureWrapper<T> {

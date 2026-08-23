@@ -41,3 +41,4 @@ TX Loader
 - Let config-driven assets override mod-driven assets (right now it's the other way around)
   - Clarify: should mods even be allowed to defined force-loaded assets?
 - Improve error message if `/tx` command has wrong number of arguments
+- Re-add progress bar
