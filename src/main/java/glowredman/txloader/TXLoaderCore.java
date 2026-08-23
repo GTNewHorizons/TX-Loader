@@ -111,8 +111,12 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
                             ConfigHandler.load();
                         },
                         EXECUTOR_IO)
-                // ensure that VERSIONS_STAGE is completed no matter what
-                .whenComplete((void_, t) -> RemoteHandler.VERSIONS_STAGE.complete(JVersionManifest.DUMMY));
+                .whenComplete((void_, t) -> {
+                    // ensure that VERSIONS_STAGE is completed no matter what
+                    RemoteHandler.VERSIONS_STAGE.complete(JVersionManifest.DUMMY);
+                    // config is loaded now -> complete LOAD_STAGE to unblock RemoteHandler.ensureNoBlocking()
+                    RemoteHandler.LOAD_STAGE.complete(null);
+                });
     }
 
     @Override

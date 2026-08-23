@@ -31,6 +31,7 @@ class RemoteHandler {
     private static final int READ_TIMEOUT = 10000;
 
     static final CompletableFuture<JVersionManifest> VERSIONS_STAGE = new CompletableFuture<>();
+    static final CompletableFuture<Void> LOAD_STAGE = new CompletableFuture<>();
     private static final Map<String, CompletableFuture<JVersionDetails>> DETAILS = new ConcurrentHashMap<>();
     private static final Map<String, CompletableFuture<Map<String, JAsset>>> ASSET_INDICES = new ConcurrentHashMap<>();
     static final Set<CompletableFuture<Void>> BLOCKING_FUTURES = new HashSet<>();
@@ -296,16 +297,16 @@ class RemoteHandler {
     static void ensureNoBlocking() {
         // early exit
         synchronized (BLOCKING_FUTURES) {
-            if (VERSIONS_STAGE.isDone() && BLOCKING_FUTURES.isEmpty()) {
+            if (LOAD_STAGE.isDone() && BLOCKING_FUTURES.isEmpty()) {
                 return;
             }
         }
 
         // copying old ResourceLoader files, fetching version manifest, loading config
-        if (!VERSIONS_STAGE.isDone()) {
+        if (!LOAD_STAGE.isDone()) {
             TXLoaderCore.LOGGER.info("Awaiting startup tasks...");
             try {
-                VERSIONS_STAGE.join();
+                LOAD_STAGE.join();
             } catch (Exception e) {
                 TXLoaderCore.LOGGER.warn("A future completed exceptionally!", e);
             }
