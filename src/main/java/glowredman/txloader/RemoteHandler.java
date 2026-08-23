@@ -306,18 +306,22 @@ class RemoteHandler {
         // fetch assets (directly or from JARs), this implicitly includes downloads of version details, asset indices
         // and JARs
         bar.step("Fetching Assets");
-        synchronized (BLOCKING_FUTURES) {
-            for (CompletableFuture<Void> future : BLOCKING_FUTURES) {
-                if (future.isDone()) {
-                    continue;
+        while (true) {
+            Set<CompletableFuture<Void>> snapshot;
+            synchronized (BLOCKING_FUTURES) {
+                if (BLOCKING_FUTURES.isEmpty()) {
+                    break;
                 }
+                snapshot = new HashSet<>(BLOCKING_FUTURES);
+                BLOCKING_FUTURES.clear();
+            }
+            for (CompletableFuture<Void> future : snapshot) {
                 try {
                     future.join();
                 } catch (Exception e) {
                     TXLoaderCore.LOGGER.warn("A future completed exceptionally!", e);
                 }
             }
-            BLOCKING_FUTURES.clear();
         }
 
         bar.pop();
