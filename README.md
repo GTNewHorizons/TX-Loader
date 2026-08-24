@@ -40,16 +40,18 @@ TX Loader
 |:---|:---|:---|
 |`-Dtxloader.keepalive.io`|10000|How long (in milliseconds) idle file IO threads are kept alive before being terminated|
 |`-Dtxloader.keepalive.net`|10000|How long (in milliseconds) idle network threads are kept alive before being terminated|
-|`-Dtxloader.poolsize.io`|32|Maximum number of file IO threads|
-|`-Dtxloader.poolsize.net`|16|Maximum number of network threads|
+|`-Dtxloader.poolsize.io`|32|Number of file IO threads|
+|`-Dtxloader.poolsize.net`|16|Number of network threads|
 |`-Dtxloader.timeout.connect`|5000|How long (in milliseconds) establishing a connection to a remote resource is attempted|
 |`-Dtxloader.timeout.read`|10000|How long (in milliseconds) beginning to read data from a remote resource is allowed to take before the connection is terminated|
 
 
 ### TODO
-- Allow some assets to be downloaded server-side too (maybe introduce a new flag in `Asset` for it)
-- Clean up `RemoteHandler`
-- Let config-driven assets override mod-driven assets (right now it's the other way around)
-  - Clarify: should mods even be allowed to defined force-loaded assets?
-- Improve error message if `/tx` command has wrong number of arguments
-- Re-add progress bar
+In order of importance:
+1. Remove hard network connectivity requirement (see [this](https://github.com/GTNewHorizons/TX-Loader/pull/18#discussion_r3567508914) and the following comment)
+2. Let config-driven assets override mod-driven assets (right now it's the other way around)
+    - Clarify: should mods even be allowed to defined force-loaded assets?
+3. Improve error message if `/tx` command has wrong number of arguments
+4. Allow some assets to be downloaded server-side too (maybe introduce a new flag in `Asset` for it)
+5. Re-add progress bar
+6. Clean up `RemoteHandler`

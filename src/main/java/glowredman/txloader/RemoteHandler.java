@@ -27,8 +27,8 @@ class RemoteHandler {
 
     private static final String MANIFEST_URL = "https://launchermeta.mojang.com/mc/game/version_manifest.json";
     private static final String RESOURCES_URL = "https://resources.download.minecraft.net/";
-    private static final int CONNECT_TIMEOUT = Integer.getInteger("txloader.timeout.connect", 5000);
-    private static final int READ_TIMEOUT = Integer.getInteger("txloader.timeout.read", 10000);
+    private static final int CONNECT_TIMEOUT;
+    private static final int READ_TIMEOUT;
 
     static final CompletableFuture<JVersionManifest> VERSIONS_STAGE = new CompletableFuture<>();
     static final CompletableFuture<Void> LOAD_STAGE = new CompletableFuture<>();
@@ -36,6 +36,27 @@ class RemoteHandler {
     private static final Map<String, CompletableFuture<Map<String, JAsset>>> ASSET_INDICES = new ConcurrentHashMap<>();
     static final Set<CompletableFuture<Void>> BLOCKING_FUTURES = new HashSet<>();
     private static final Set<Path> PATHS = ConcurrentHashMap.newKeySet();
+
+    static {
+        // get arguments
+        int connectTimeout = Integer.getInteger("txloader.timeout.connect", 5000);
+        int readTimeout = Integer.getInteger("txloader.timeout.read", 10000);
+
+        // check for invalid values
+        if (connectTimeout < 0) {
+            TXLoaderCore.LOGGER
+                    .warn("-Dtxloader.timeout.connect must be non-negative ({}), ignoring argument", connectTimeout);
+            connectTimeout = 5000;
+        }
+        if (readTimeout < 0) {
+            TXLoaderCore.LOGGER
+                    .warn("-Dtxloader.timeout.read must be non-negative ({}), ignoring argument", readTimeout);
+            readTimeout = 10000;
+        }
+
+        CONNECT_TIMEOUT = connectTimeout;
+        READ_TIMEOUT = readTimeout;
+    }
 
     static JVersionManifest fetchVersions() {
         Path path = JarHandler.txloaderCache.resolve("version_manifest.json");

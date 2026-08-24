@@ -43,11 +43,31 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
     static Path forceResourcesDir;
 
     static {
+        // get arguments
         int poolSizeIO = Integer.getInteger("txloader.poolsize.io", 32);
         int poolSizeNet = Integer.getInteger("txloader.poolsize.net", 16);
         long keepAliveIO = Long.getLong("txloader.keepalive.io", 10000);
         long keepAliveNet = Long.getLong("txloader.keepalive.net", 10000);
 
+        // check for invalid values
+        if (poolSizeIO < 1) {
+            LOGGER.warn("-Dtxloader.poolsize.io must be positive ({}), ignoring argument", poolSizeIO);
+            poolSizeIO = 32;
+        }
+        if (poolSizeNet < 1) {
+            LOGGER.warn("-Dtxloader.poolsize.net must be positive ({}), ignoring argument", poolSizeNet);
+            poolSizeNet = 16;
+        }
+        if (keepAliveIO < 0) {
+            LOGGER.warn("-Dtxloader.keepalive.io must be positive ({}), ignoring argument", keepAliveIO);
+            keepAliveIO = 10000;
+        }
+        if (keepAliveNet < 0) {
+            LOGGER.warn("-Dtxloader.keepalive.net must be positive ({}), ignoring argument", keepAliveNet);
+            keepAliveNet = 10000;
+        }
+
+        // construct executors
         EXECUTOR_IO = new ThreadPoolExecutor(
                 poolSizeIO,
                 poolSizeIO,
@@ -63,6 +83,9 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
                 TimeUnit.MILLISECONDS,
                 new LinkedBlockingQueue<>(),
                 new ThreadFactoryBuilder().setNameFormat("TX Loader NET #%d").setDaemon(true).build());
+
+        ((ThreadPoolExecutor) EXECUTOR_IO).allowCoreThreadTimeOut(true);
+        ((ThreadPoolExecutor) EXECUTOR_NET).allowCoreThreadTimeOut(true);
     }
 
     @Override
@@ -92,27 +115,25 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
         forceResourcesDir = configDir.resolve("forceload");
 
         try {
-            Files.createDirectories(resourcesDir);
-            Files.createDirectories(forceResourcesDir);
-        } catch (IOException e) {
-            LOGGER.error("Failed to create resource directories!", e);
-            RemoteHandler.VERSIONS_STAGE.complete(JVersionManifest.DUMMY);
-            return;
-        }
+            try {
+                Files.createDirectories(resourcesDir);
+                Files.createDirectories(forceResourcesDir);
+            } catch (IOException e) {
+                LOGGER.error("Failed to create resource directories!", e);
+                return;
+            }
 
-        if (FMLLaunchHandler.side().isServer()) {
-            RemoteHandler.VERSIONS_STAGE.complete(JVersionManifest.DUMMY);
-            ServerLangHelper.load();
-            return;
-        }
+            if (FMLLaunchHandler.side().isServer()) {
+                ServerLangHelper.load();
+                return;
+            }
 
-        if (JarHandler.initCache()) {
-            RemoteHandler.VERSIONS_STAGE.complete(JVersionManifest.DUMMY);
-            return;
+            if (JarHandler.initCache()) {
+                return;
+            }
+        } finally {
+            completeStartupStages();
         }
-
-        ((ThreadPoolExecutor) EXECUTOR_IO).allowCoreThreadTimeOut(true);
-        ((ThreadPoolExecutor) EXECUTOR_NET).allowCoreThreadTimeOut(true);
 
         CompletableFuture.runAsync(ConfigHandler::moveRLAssets, EXECUTOR_IO)
                 .thenAcceptBothAsync(
@@ -124,10 +145,18 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
                         EXECUTOR_IO)
                 .whenComplete((void_, t) -> {
                     // ensure that VERSIONS_STAGE is completed no matter what
-                    RemoteHandler.VERSIONS_STAGE.complete(JVersionManifest.DUMMY);
                     // config is loaded now -> complete LOAD_STAGE to unblock RemoteHandler.ensureNoBlocking()
-                    RemoteHandler.LOAD_STAGE.complete(null);
+                    completeStartupStages();
+                    // log error if one occured
+                    if (t != null) {
+                        LOGGER.error("An error occured in any of the startup tasks", t);
+                    }
                 });
+    }
+
+    private static void completeStartupStages() {
+        RemoteHandler.VERSIONS_STAGE.complete(JVersionManifest.DUMMY);
+        RemoteHandler.LOAD_STAGE.complete(null);
     }
 
     @Override
