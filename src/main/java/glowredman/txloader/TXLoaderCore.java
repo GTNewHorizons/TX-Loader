@@ -58,11 +58,11 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
             LOGGER.warn("-Dtxloader.poolsize.net must be positive ({}), ignoring argument", poolSizeNet);
             poolSizeNet = 16;
         }
-        if (keepAliveIO < 0) {
+        if (keepAliveIO < 1) {
             LOGGER.warn("-Dtxloader.keepalive.io must be positive ({}), ignoring argument", keepAliveIO);
             keepAliveIO = 10000;
         }
-        if (keepAliveNet < 0) {
+        if (keepAliveNet < 1) {
             LOGGER.warn("-Dtxloader.keepalive.net must be positive ({}), ignoring argument", keepAliveNet);
             keepAliveNet = 10000;
         }
