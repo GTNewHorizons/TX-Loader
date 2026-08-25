@@ -114,25 +114,9 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
         resourcesDir = configDir.resolve("load");
         forceResourcesDir = configDir.resolve("forceload");
 
-        try {
-            try {
-                Files.createDirectories(resourcesDir);
-                Files.createDirectories(forceResourcesDir);
-            } catch (IOException e) {
-                LOGGER.error("Failed to create resource directories!", e);
-                return;
-            }
-
-            if (FMLLaunchHandler.side().isServer()) {
-                ServerLangHelper.load();
-                return;
-            }
-
-            if (JarHandler.initCache()) {
-                return;
-            }
-        } finally {
-            completeStartupStages();
+        if (preStartup()) {
+            postStartup();
+            return;
         }
 
         CompletableFuture.runAsync(ConfigHandler::moveRLAssets, EXECUTOR_IO)
@@ -146,7 +130,7 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
                 .whenComplete((void_, t) -> {
                     // ensure that VERSIONS_STAGE is completed no matter what
                     // config is loaded now -> complete LOAD_STAGE to unblock RemoteHandler.ensureNoBlocking()
-                    completeStartupStages();
+                    postStartup();
                     // log error if one occured
                     if (t != null) {
                         LOGGER.error("An error occured in any of the startup tasks", t);
@@ -154,7 +138,31 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
                 });
     }
 
-    private static void completeStartupStages() {
+    /**
+     * @return {@code true} if the startup stages should be completed immediately (instead of actually fetching the
+     *         version manifest etc.)
+     */
+    private static boolean preStartup() {
+        try {
+            Files.createDirectories(resourcesDir);
+            Files.createDirectories(forceResourcesDir);
+        } catch (IOException e) {
+            LOGGER.error("Failed to create resource directories!", e);
+            return true;
+        }
+
+        if (FMLLaunchHandler.side().isServer()) {
+            ServerLangHelper.load();
+            return true;
+        }
+
+        return JarHandler.initCache();
+    }
+
+    /**
+     * Ensures that both startup stages are completed
+     */
+    private static void postStartup() {
         RemoteHandler.VERSIONS_STAGE.complete(JVersionManifest.DUMMY);
         RemoteHandler.LOAD_STAGE.complete(null);
     }
