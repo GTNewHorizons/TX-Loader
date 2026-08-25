@@ -113,18 +113,19 @@ class RemoteHandler {
             return CompletableFuture.completedFuture(null);
         }
 
-        CompletableFuture<JVersionDetails> detailsBaseStage = DETAILS
-                .computeIfAbsent(version, RemoteHandler::verifyDetailsExist);
-        CompletableFuture<JVersionDetails> detailsStage = detailsBaseStage
-                .whenComplete((details, t) -> resetOnFailure(DETAILS, detailsBaseStage, version, details));
-
         if (source == Source.ASSET) {
-            CompletableFuture<Map<String, JAsset>> baseFuture = ASSET_INDICES.computeIfAbsent(
-                    version,
-                    v -> detailsStage
-                            .thenApplyAsync(details -> verifyAssetIndexExists(v, details), TXLoaderCore.EXECUTOR_NET));
-            CompletableFuture<Void> future = baseFuture
-                    .whenComplete((assetIndex, t) -> resetOnFailure(ASSET_INDICES, baseFuture, version, assetIndex))
+            CompletableFuture<Map<String, JAsset>> assetIndexBaseStage = ASSET_INDICES.computeIfAbsent(version, v -> {
+                CompletableFuture<JVersionDetails> detailsBaseStage = DETAILS
+                        .computeIfAbsent(version, RemoteHandler::verifyDetailsExist);
+
+                return detailsBaseStage
+                        .whenComplete((details, t) -> resetOnFailure(DETAILS, detailsBaseStage, version, details))
+                        .thenApplyAsync(details -> verifyAssetIndexExists(v, details), TXLoaderCore.EXECUTOR_NET);
+            });
+
+            CompletableFuture<Void> future = assetIndexBaseStage
+                    .whenComplete(
+                            (assetIndex, t) -> resetOnFailure(ASSET_INDICES, assetIndexBaseStage, version, assetIndex))
                     .thenAcceptAsync(
                             assetIndex -> fetchDirect(assetIndex, asset, path, version),
                             TXLoaderCore.EXECUTOR_NET);
@@ -138,13 +139,29 @@ class RemoteHandler {
 
         // asset from client/server jar:
         boolean isClient = source == Source.CLIENT;
-
         Map<String, CompletableFuture<Path>> cachedJars = isClient ? JarHandler.CACHED_CLIENT_JARS
                 : JarHandler.CACHED_SERVER_JARS;
-        CompletableFuture<Path> baseFuture = cachedJars.computeIfAbsent(
-                version,
-                v -> detailsStage
-                        .thenApplyAsync(details -> verifyJarExists(details, v, isClient), TXLoaderCore.EXECUTOR_NET));
+
+        CompletableFuture<Path> baseFuture = cachedJars
+                .computeIfAbsent(
+                        version,
+                        v -> CompletableFuture
+                                .supplyAsync(() -> JarHandler.searchJar(v, isClient), TXLoaderCore.EXECUTOR_IO))
+                .thenComposeAsync(jarPath -> {
+                    if (jarPath == null) {
+                        CompletableFuture<JVersionDetails> detailsBaseStage = DETAILS
+                                .computeIfAbsent(version, RemoteHandler::verifyDetailsExist);
+
+                        return detailsBaseStage
+                                .whenComplete(
+                                        (details, t) -> resetOnFailure(DETAILS, detailsBaseStage, version, details))
+                                .thenApplyAsync(
+                                        details -> downloadJar(details, version, isClient),
+                                        TXLoaderCore.EXECUTOR_NET);
+                    }
+                    return CompletableFuture.completedFuture(jarPath);
+                }, TXLoaderCore.EXECUTOR_IO);
+
         CompletableFuture<Void> future = baseFuture
                 .whenComplete((jarPath, t) -> resetOnFailure(cachedJars, baseFuture, version, jarPath))
                 .thenAcceptAsync(jarPath -> fetchFromJar(asset, jarPath, path), TXLoaderCore.EXECUTOR_IO);
@@ -212,26 +229,21 @@ class RemoteHandler {
         }
     }
 
-    private static Path verifyJarExists(JVersionDetails details, String version, boolean isClient) {
-        Path path = JarHandler.searchJar(version, isClient);
-
-        if (path == null) {
-            if (details == null) {
-                return null;
-            }
-
-            try {
-                if (isClient) {
-                    return details.downloads.client.downloadJar(version, "client.jar");
-                }
-                return details.downloads.server.downloadJar(version, "server.jar");
-            } catch (Exception e) {
-                TXLoaderCore.LOGGER
-                        .error("Failed to download {} JAR for version {}!", isClient ? "client" : "server", version, e);
-                return null;
-            }
+    private static Path downloadJar(JVersionDetails details, String version, boolean isClient) {
+        if (details == null) {
+            return null;
         }
-        return path;
+
+        try {
+            if (isClient) {
+                return details.downloads.client.downloadJar(version, "client.jar");
+            }
+            return details.downloads.server.downloadJar(version, "server.jar");
+        } catch (Exception e) {
+            TXLoaderCore.LOGGER
+                    .error("Failed to download {} JAR for version {}!", isClient ? "client" : "server", version, e);
+            return null;
+        }
     }
 
     private static void fetchDirect(Map<String, JAsset> assets, Asset asset, Path path, String version) {
