@@ -211,6 +211,11 @@ class RemoteHandler {
                 return TXLoaderCore.GSON.fromJson(reader, JVersionDetails.class);
             } catch (Exception e) {
                 TXLoaderCore.LOGGER.error("Failed to get version details for version {}", version, e);
+                try {
+                    Files.delete(path);
+                } catch (Exception e2) {
+                    TXLoaderCore.LOGGER.error("Failed to delete corrupted version details for version {}", version, e2);
+                }
                 return null;
             }
         }, TXLoaderCore.EXECUTOR_NET);
@@ -236,6 +241,11 @@ class RemoteHandler {
             return TXLoaderCore.GSON.fromJson(reader, JAssetIndex.class).objects;
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed to get asset index for version {}!", version, e);
+            try {
+                Files.delete(path);
+            } catch (Exception e2) {
+                TXLoaderCore.LOGGER.error("Failed to delete corrupted asset index for version {}!", version, e2);
+            }
             return null;
         }
     }
