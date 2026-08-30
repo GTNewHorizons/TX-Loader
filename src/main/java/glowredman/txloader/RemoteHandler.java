@@ -286,6 +286,8 @@ class RemoteHandler {
             return;
         }
 
+        (asset.forceLoad ? TXResourcePack.instanceForce : TXResourcePack.instanceNormal).dirty = true;
+
         TXLoaderCore.LOGGER.debug("Successfully fetched {}", asset.resourceLocation);
     }
 
@@ -309,6 +311,8 @@ class RemoteHandler {
             TXLoaderCore.LOGGER.error("Failed to extract asset from JAR! Path: {}", asset.resourceLocation, e);
             return;
         }
+
+        (asset.forceLoad ? TXResourcePack.instanceForce : TXResourcePack.instanceNormal).dirty = true;
 
         TXLoaderCore.LOGGER.debug("Successfully fetched {}", asset.resourceLocation);
     }

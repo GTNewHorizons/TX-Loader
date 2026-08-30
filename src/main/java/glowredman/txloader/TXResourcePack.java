@@ -19,6 +19,10 @@ import net.minecraft.util.ResourceLocation;
 
 public class TXResourcePack implements IResourcePack {
 
+    static TXResourcePack instanceNormal;
+    static TXResourcePack instanceForce;
+    volatile boolean dirty;
+
     private final String name;
     private final Path dir;
     private volatile Set<ResourceLocation> resources;
@@ -36,6 +40,11 @@ public class TXResourcePack implements IResourcePack {
     @Override
     public boolean resourceExists(ResourceLocation rl) {
         RemoteHandler.ensureNoBlocking();
+
+        if (this.dirty) {
+            this.indexResources();
+            this.dirty = false;
+        }
 
         Set<ResourceLocation> indexedResources = this.resources;
         if (indexedResources != null) {
@@ -62,8 +71,8 @@ public class TXResourcePack implements IResourcePack {
         this.indexResources();
 
         Set<String> resourceDomains = new HashSet<>();
-        try (Stream<Path> dirs = Files.list(this.dir).filter(Files::isDirectory)) {
-            dirs.forEach(p -> resourceDomains.add(p.getFileName().toString()));
+        try (Stream<Path> dirs = Files.list(this.dir)) {
+            dirs.filter(Files::isDirectory).forEach(p -> resourceDomains.add(p.getFileName().toString()));
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed to get resource domains of directory {}", this.dir, e);
         }
