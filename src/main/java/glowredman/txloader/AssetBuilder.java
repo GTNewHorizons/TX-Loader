@@ -88,6 +88,6 @@ public class AssetBuilder {
      */
     @Nonnull
     public CompletableFuture<Void> fetch() {
-        return RemoteHandler.fetchAsset(this.asset);
+        return RemoteHandler.fetchAsset(this.asset).future;
     }
 }

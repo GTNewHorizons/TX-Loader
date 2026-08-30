@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +23,7 @@ import java.util.jar.JarFile;
 import javax.annotation.Nonnull;
 
 import glowredman.txloader.Asset.Source;
+import glowredman.txloader.CompletableFutureWrapper.State;
 
 class RemoteHandler {
 
@@ -32,12 +34,14 @@ class RemoteHandler {
 
     static final CompletableFuture<JVersionManifest> VERSIONS_STAGE = new CompletableFuture<>();
     static final CompletableFuture<Void> LOAD_STAGE = new CompletableFuture<>();
-    static final CompletableFuture<Void> DUPLICATE_ASSET = CompletableFuture.completedFuture(null);
     private static final CompletableFuture<Void> FILE_EXISTS = CompletableFuture.completedFuture(null);
+    private static final CompletableFutureWrapper<Void> FILE_EXISTS_WRAPPER = new CompletableFutureWrapper<>(
+            CompletableFuture.completedFuture(null),
+            State.FILE_EXISTS);
     private static final Map<String, CompletableFuture<JVersionDetails>> DETAILS = new ConcurrentHashMap<>();
     private static final Map<String, CompletableFuture<Map<String, JAsset>>> ASSET_INDICES = new ConcurrentHashMap<>();
     static final Set<CompletableFuture<Void>> BLOCKING_FUTURES = new HashSet<>();
-    private static final Set<Path> PATHS = ConcurrentHashMap.newKeySet();
+    private static final Map<Path, CompletableFuture<Void>> PATHS = new HashMap<>();
 
     static {
         // get arguments
@@ -96,83 +100,88 @@ class RemoteHandler {
         return manifest;
     }
 
-    static CompletableFuture<Void> fetchAsset(@Nonnull Asset asset) {
+    static CompletableFutureWrapper<Void> fetchAsset(@Nonnull Asset asset) {
         Path path = asset.getPath();
         String version = asset.getVersion();
         Source source = asset.getSource();
 
-        if (!PATHS.add(path)) {
-            TXLoaderCore.LOGGER.warn(
-                    "Duplicate asset defined for {}, skipping {} on version {} for source {}",
-                    asset.getResourceLocation(),
-                    asset.resourceLocation,
+        synchronized (PATHS) {
+            CompletableFuture<Void> existingFuture = PATHS.get(path);
+            if (existingFuture != null) {
+                TXLoaderCore.LOGGER.warn(
+                        "Duplicate asset defined for {}, skipping {} on version {} for source {}",
+                        asset.getResourceLocation(),
+                        asset.resourceLocation,
+                        version,
+                        source);
+                return new CompletableFutureWrapper<>(existingFuture, State.DUPLICATE_ASSET);
+            }
+
+            if (Files.exists(path)) {
+                PATHS.put(path, FILE_EXISTS);
+                return FILE_EXISTS_WRAPPER;
+            }
+
+            if (source == Source.ASSET) {
+                CompletableFuture<Map<String, JAsset>> assetIndexBaseStage = ASSET_INDICES
+                        .computeIfAbsent(version, v -> {
+                            CompletableFuture<JVersionDetails> detailsBaseStage = DETAILS
+                                    .computeIfAbsent(version, RemoteHandler::verifyDetailsExist);
+
+                            return detailsBaseStage
+                                    .whenComplete(
+                                            (details, t) -> resetOnFailure(DETAILS, detailsBaseStage, version, details))
+                                    .thenApplyAsync(
+                                            details -> verifyAssetIndexExists(v, details),
+                                            TXLoaderCore.EXECUTOR_NET);
+                        });
+
+                CompletableFuture<Void> future = assetIndexBaseStage.whenComplete(
+                        (assetIndex, t) -> resetOnFailure(ASSET_INDICES, assetIndexBaseStage, version, assetIndex))
+                        .thenAcceptAsync(
+                                assetIndex -> fetchDirect(assetIndex, asset, path, version),
+                                TXLoaderCore.EXECUTOR_NET);
+
+                synchronized (BLOCKING_FUTURES) {
+                    BLOCKING_FUTURES.add(future);
+                }
+
+                return new CompletableFutureWrapper<Void>(future, State.NEW);
+            }
+
+            // asset from client/server jar:
+            boolean isClient = source == Source.CLIENT;
+            Map<String, CompletableFuture<Path>> cachedJars = isClient ? JarHandler.CACHED_CLIENT_JARS
+                    : JarHandler.CACHED_SERVER_JARS;
+
+            CompletableFuture<Path> baseFuture = cachedJars.computeIfAbsent(
                     version,
-                    source);
-            return DUPLICATE_ASSET;
-        }
+                    v -> CompletableFuture
+                            .supplyAsync(() -> JarHandler.searchJar(v, isClient), TXLoaderCore.EXECUTOR_IO)
+                            .thenComposeAsync(jarPath -> {
+                                if (jarPath == null) {
+                                    CompletableFuture<JVersionDetails> detailsBaseStage = DETAILS
+                                            .computeIfAbsent(v, RemoteHandler::verifyDetailsExist);
 
-        if (Files.exists(path)) {
-            return FILE_EXISTS;
-        }
+                                    return detailsBaseStage.whenComplete(
+                                            (details, t) -> resetOnFailure(DETAILS, detailsBaseStage, v, details))
+                                            .thenApplyAsync(
+                                                    details -> downloadJar(details, v, isClient),
+                                                    TXLoaderCore.EXECUTOR_NET);
+                                }
+                                return CompletableFuture.completedFuture(jarPath);
+                            }, TXLoaderCore.EXECUTOR_IO));
 
-        if (source == Source.ASSET) {
-            CompletableFuture<Map<String, JAsset>> assetIndexBaseStage = ASSET_INDICES.computeIfAbsent(version, v -> {
-                CompletableFuture<JVersionDetails> detailsBaseStage = DETAILS
-                        .computeIfAbsent(version, RemoteHandler::verifyDetailsExist);
-
-                return detailsBaseStage
-                        .whenComplete((details, t) -> resetOnFailure(DETAILS, detailsBaseStage, version, details))
-                        .thenApplyAsync(details -> verifyAssetIndexExists(v, details), TXLoaderCore.EXECUTOR_NET);
-            });
-
-            CompletableFuture<Void> future = assetIndexBaseStage
-                    .whenComplete(
-                            (assetIndex, t) -> resetOnFailure(ASSET_INDICES, assetIndexBaseStage, version, assetIndex))
-                    .thenAcceptAsync(
-                            assetIndex -> fetchDirect(assetIndex, asset, path, version),
-                            TXLoaderCore.EXECUTOR_NET);
+            CompletableFuture<Void> future = baseFuture
+                    .whenComplete((jarPath, t) -> resetOnFailure(cachedJars, baseFuture, version, jarPath))
+                    .thenAcceptAsync(jarPath -> fetchFromJar(asset, jarPath, path), TXLoaderCore.EXECUTOR_IO);
 
             synchronized (BLOCKING_FUTURES) {
                 BLOCKING_FUTURES.add(future);
             }
 
-            return future;
+            return new CompletableFutureWrapper<Void>(future, State.NEW);
         }
-
-        // asset from client/server jar:
-        boolean isClient = source == Source.CLIENT;
-        Map<String, CompletableFuture<Path>> cachedJars = isClient ? JarHandler.CACHED_CLIENT_JARS
-                : JarHandler.CACHED_SERVER_JARS;
-
-        CompletableFuture<Path> baseFuture = cachedJars
-                .computeIfAbsent(
-                        version,
-                        v -> CompletableFuture
-                                .supplyAsync(() -> JarHandler.searchJar(v, isClient), TXLoaderCore.EXECUTOR_IO))
-                .thenComposeAsync(jarPath -> {
-                    if (jarPath == null) {
-                        CompletableFuture<JVersionDetails> detailsBaseStage = DETAILS
-                                .computeIfAbsent(version, RemoteHandler::verifyDetailsExist);
-
-                        return detailsBaseStage
-                                .whenComplete(
-                                        (details, t) -> resetOnFailure(DETAILS, detailsBaseStage, version, details))
-                                .thenApplyAsync(
-                                        details -> downloadJar(details, version, isClient),
-                                        TXLoaderCore.EXECUTOR_NET);
-                    }
-                    return CompletableFuture.completedFuture(jarPath);
-                }, TXLoaderCore.EXECUTOR_IO);
-
-        CompletableFuture<Void> future = baseFuture
-                .whenComplete((jarPath, t) -> resetOnFailure(cachedJars, baseFuture, version, jarPath))
-                .thenAcceptAsync(jarPath -> fetchFromJar(asset, jarPath, path), TXLoaderCore.EXECUTOR_IO);
-
-        synchronized (BLOCKING_FUTURES) {
-            BLOCKING_FUTURES.add(future);
-        }
-
-        return future;
     }
 
     private static CompletableFuture<JVersionDetails> verifyDetailsExist(String version) {

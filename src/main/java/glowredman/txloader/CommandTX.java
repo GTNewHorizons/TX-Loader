@@ -15,6 +15,7 @@ import net.minecraft.util.IChatComponent;
 import net.minecraftforge.client.ClientCommandHandler;
 
 import glowredman.txloader.Asset.Source;
+import glowredman.txloader.CompletableFutureWrapper.State;
 import glowredman.txloader.RemoteHandler.JVersion;
 import glowredman.txloader.RemoteHandler.JVersionManifest;
 
@@ -97,7 +98,7 @@ class CommandTX implements ICommand {
                     asset.forceLoad = args[5].equals("true");
                 }
             }
-            if (RemoteHandler.fetchAsset(asset) != RemoteHandler.DUPLICATE_ASSET) {
+            if (RemoteHandler.fetchAsset(asset).state != State.DUPLICATE_ASSET) {
                 ConfigHandler.ASSETS.add(asset);
                 sender.addChatMessage(getColoredText("Done. Don't forget to save!", EnumChatFormatting.GREEN));
                 return;
