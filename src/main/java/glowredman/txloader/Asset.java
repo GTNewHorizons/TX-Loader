@@ -4,6 +4,8 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
+import com.google.common.base.Objects;
+
 public class Asset {
 
     // setting the version is no longer optional, this is for backwards compatibility
@@ -36,6 +38,25 @@ public class Asset {
 
     Source getSource() {
         return this.source == null ? Source.ASSET : this.source;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (!(obj instanceof Asset a)) {
+            return false;
+        }
+        return Objects.equal(this.resourceLocation, a.resourceLocation)
+                && Objects.equal(this.resourceLocationOverride, a.resourceLocationOverride)
+                && this.forceLoad == a.forceLoad
+                && Objects.equal(this.version, a.version)
+                && this.source == a.source;
+    }
+
+    @Override
+    public String toString() {
+        return Objects.toStringHelper(this).add("resourceLocation", this.resourceLocation)
+                .add("resourceLocationOverride", this.resourceLocationOverride).add("forceLoad", this.forceLoad)
+                .add("version", this.version).add("source", this.source).toString();
     }
 
     public enum Source {
