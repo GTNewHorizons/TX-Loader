@@ -314,7 +314,7 @@ class RemoteHandler {
     }
 
     private static void copyWithTempFile(Callable<InputStream> in, Path path) throws Exception {
-        Path temp = Files.createTempFile(path.getParent(), null, null);
+        Path temp = Files.createTempFile(JarHandler.txloaderCache, null, null);
         try {
             try (InputStream is = in.call()) {
                 Files.copy(is, temp, StandardCopyOption.REPLACE_EXISTING);
