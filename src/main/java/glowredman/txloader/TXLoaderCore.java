@@ -119,14 +119,12 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
             return;
         }
 
-        CompletableFuture.runAsync(ConfigHandler::moveRLAssets, EXECUTOR_IO)
-                .thenAcceptBothAsync(
-                        CompletableFuture.supplyAsync(RemoteHandler::fetchVersions, EXECUTOR_NET),
-                        (void_, manifest) -> {
-                            RemoteHandler.VERSIONS_STAGE.complete(manifest);
-                            ConfigHandler.load();
-                        },
-                        EXECUTOR_IO)
+        CompletableFuture
+                .allOf(
+                        CompletableFuture.runAsync(ConfigHandler::moveRLAssets, EXECUTOR_IO)
+                                .thenRunAsync(ConfigHandler::load, EXECUTOR_IO),
+                        CompletableFuture.supplyAsync(RemoteHandler::fetchVersions, EXECUTOR_NET)
+                                .thenAcceptAsync(RemoteHandler.VERSIONS_STAGE::complete, EXECUTOR_IO))
                 .whenComplete((void_, t) -> {
                     // ensure that VERSIONS_STAGE is completed no matter what
                     // config is loaded now -> complete LOAD_STAGE to unblock RemoteHandler.ensureNoBlocking()

@@ -83,7 +83,7 @@ class RemoteHandler {
             TXLoaderCore.LOGGER.error("No cached manifest found!");
         }
 
-        if (manifest == null) {
+        if (manifest == null || manifest.versions == null) {
             return JVersionManifest.DUMMY;
         }
 
