@@ -51,7 +51,8 @@ In order of importance:
 1. Remove hard network connectivity requirement (see [this](https://github.com/GTNewHorizons/TX-Loader/pull/18#discussion_r3567508914) and the following comment)
 2. Let config-driven assets override mod-driven assets (right now it's the other way around)
     - Clarify: should mods even be allowed to defined force-loaded assets?
-3. Improve error message if `/tx` command has wrong number of arguments
-4. Allow some assets to be downloaded server-side too (maybe introduce a new flag in `Asset` for it)
-5. Re-add progress bar
-6. Clean up `RemoteHandler`
+3. Cache open `JarFile`s
+4. Improve error message if `/tx` command has wrong number of arguments
+5. Allow some assets to be downloaded server-side too (maybe introduce a new flag in `Asset` for it)
+6. Re-add progress bar
+7. Clean up `RemoteHandler`
