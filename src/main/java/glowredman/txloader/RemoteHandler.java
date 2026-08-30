@@ -1,7 +1,6 @@
 package glowredman.txloader;
 
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
@@ -15,6 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.jar.JarEntry;
@@ -294,9 +294,7 @@ class RemoteHandler {
             }
 
             Files.createDirectories(targetPath.getParent());
-            try (InputStream is = jarFile.getInputStream(jarEntry)) {
-                Files.copy(is, targetPath);
-            }
+            copyWithTempFile(() -> jarFile.getInputStream(jarEntry), targetPath);
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed to extract asset from JAR! Path: {}", asset.resourceLocation, e);
             return;
@@ -305,14 +303,20 @@ class RemoteHandler {
         TXLoaderCore.LOGGER.debug("Successfully fetched {}", asset.resourceLocation);
     }
 
-    private static void download(String url, Path path) throws IOException {
+    private static void download(String url, Path path) throws Exception {
         TXLoaderCore.LOGGER.info("Downloading {} to {}", url, path);
-        Path temp = Files.createTempFile(path.getParent(), null, null);
-        try {
+        copyWithTempFile(() -> {
             URLConnection connection = new URL(url).openConnection();
             connection.setConnectTimeout(CONNECT_TIMEOUT);
             connection.setReadTimeout(READ_TIMEOUT);
-            try (InputStream is = connection.getInputStream()) {
+            return connection.getInputStream();
+        }, path);
+    }
+
+    private static void copyWithTempFile(Callable<InputStream> in, Path path) throws Exception {
+        Path temp = Files.createTempFile(path.getParent(), null, null);
+        try {
+            try (InputStream is = in.call()) {
                 Files.copy(is, temp, StandardCopyOption.REPLACE_EXISTING);
             }
             try {
@@ -416,7 +420,7 @@ class RemoteHandler {
 
         String url;
 
-        Path downloadJar(String version, String fileName) throws IOException {
+        Path downloadJar(String version, String fileName) throws Exception {
             Path dir = JarHandler.txloaderCache.resolve(version);
             Files.createDirectories(dir);
             Path jar = dir.resolve(fileName);
@@ -440,7 +444,7 @@ class RemoteHandler {
 
         String hash;
 
-        void download(Path path) throws IOException {
+        void download(Path path) throws Exception {
             Files.createDirectories(path.getParent());
             StringBuilder sb = new StringBuilder(84);
             sb.append(RESOURCES_URL);
