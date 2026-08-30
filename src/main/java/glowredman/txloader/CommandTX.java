@@ -97,9 +97,13 @@ class CommandTX implements ICommand {
                     asset.forceLoad = args[5].equals("true");
                 }
             }
-            RemoteHandler.fetchAsset(asset);
-            ConfigHandler.ASSETS.add(asset);
-            sender.addChatMessage(getColoredText("Done. Don't forget to save!", EnumChatFormatting.GREEN));
+            if (RemoteHandler.fetchAsset(asset) != RemoteHandler.DUPLICATE_ASSET) {
+                ConfigHandler.ASSETS.add(asset);
+                sender.addChatMessage(getColoredText("Done. Don't forget to save!", EnumChatFormatting.GREEN));
+                return;
+            }
+            sender.addChatMessage(
+                    getColoredText("An asset for this resource location is already defined!", EnumChatFormatting.RED));
         }
     }
 

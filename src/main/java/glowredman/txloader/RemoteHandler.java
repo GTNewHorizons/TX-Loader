@@ -32,6 +32,8 @@ class RemoteHandler {
 
     static final CompletableFuture<JVersionManifest> VERSIONS_STAGE = new CompletableFuture<>();
     static final CompletableFuture<Void> LOAD_STAGE = new CompletableFuture<>();
+    static final CompletableFuture<Void> DUPLICATE_ASSET = CompletableFuture.completedFuture(null);
+    private static final CompletableFuture<Void> FILE_EXISTS = CompletableFuture.completedFuture(null);
     private static final Map<String, CompletableFuture<JVersionDetails>> DETAILS = new ConcurrentHashMap<>();
     private static final Map<String, CompletableFuture<Map<String, JAsset>>> ASSET_INDICES = new ConcurrentHashMap<>();
     static final Set<CompletableFuture<Void>> BLOCKING_FUTURES = new HashSet<>();
@@ -106,11 +108,11 @@ class RemoteHandler {
                     asset.resourceLocation,
                     version,
                     source);
-            return CompletableFuture.completedFuture(null);
+            return DUPLICATE_ASSET;
         }
 
         if (Files.exists(path)) {
-            return CompletableFuture.completedFuture(null);
+            return FILE_EXISTS;
         }
 
         if (source == Source.ASSET) {
