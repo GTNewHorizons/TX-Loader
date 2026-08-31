@@ -19,8 +19,8 @@ import net.minecraft.util.ResourceLocation;
 
 public class TXResourcePack implements IResourcePack {
 
-    static TXResourcePack instanceNormal;
-    static TXResourcePack instanceForce;
+    static volatile TXResourcePack instanceNormal;
+    static volatile TXResourcePack instanceForce;
     volatile boolean dirty;
 
     private final String name;

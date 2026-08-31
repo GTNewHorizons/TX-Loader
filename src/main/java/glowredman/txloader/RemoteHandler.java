@@ -286,7 +286,10 @@ class RemoteHandler {
             return;
         }
 
-        (asset.forceLoad ? TXResourcePack.instanceForce : TXResourcePack.instanceNormal).dirty = true;
+        TXResourcePack pack = asset.forceLoad ? TXResourcePack.instanceForce : TXResourcePack.instanceNormal;
+        if (pack != null) {
+            pack.dirty = true;
+        }
 
         TXLoaderCore.LOGGER.debug("Successfully fetched {}", asset.resourceLocation);
     }
