@@ -146,6 +146,7 @@ class RemoteHandler {
                     BLOCKING_FUTURES.add(future);
                 }
 
+                PATHS.put(path, future);
                 return new CompletableFutureWrapper<Void>(future, State.NEW);
             }
 
@@ -180,6 +181,7 @@ class RemoteHandler {
                 BLOCKING_FUTURES.add(future);
             }
 
+            PATHS.put(path, future);
             return new CompletableFutureWrapper<Void>(future, State.NEW);
         }
     }
