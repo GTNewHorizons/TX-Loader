@@ -41,6 +41,7 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
     static Path configDir;
     static Path resourcesDir;
     static Path forceResourcesDir;
+    static Path tempDir;
 
     static {
         // get arguments
@@ -113,6 +114,7 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
         configDir = mcLocation.resolve("config").resolve("txloader");
         resourcesDir = configDir.resolve("load");
         forceResourcesDir = configDir.resolve("forceload");
+        tempDir = configDir.resolve("temp");
 
         if (preStartup()) {
             postStartup();
@@ -143,6 +145,7 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
         try {
             Files.createDirectories(resourcesDir);
             Files.createDirectories(forceResourcesDir);
+            Files.createDirectories(tempDir);
         } catch (IOException e) {
             LOGGER.error("Failed to create resource directories!", e);
             return true;

@@ -309,7 +309,7 @@ class RemoteHandler {
             }
 
             Files.createDirectories(targetPath.getParent());
-            copyWithTempFile(() -> jarFile.getInputStream(jarEntry), targetPath);
+            copyWithTempFile(() -> jarFile.getInputStream(jarEntry), TXLoaderCore.tempDir, targetPath);
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed to extract asset from JAR! Path: {}", asset.resourceLocation, e);
             return;
@@ -327,20 +327,20 @@ class RemoteHandler {
             connection.setConnectTimeout(CONNECT_TIMEOUT);
             connection.setReadTimeout(READ_TIMEOUT);
             return connection.getInputStream();
-        }, path);
+        }, JarHandler.txloaderCache, path);
     }
 
-    private static void copyWithTempFile(Callable<InputStream> in, Path path) throws Exception {
-        Path temp = Files.createTempFile(JarHandler.txloaderCache, null, null);
+    private static void copyWithTempFile(Callable<InputStream> in, Path cacheDir, Path targetPath) throws Exception {
+        Path temp = Files.createTempFile(cacheDir, null, null);
         try {
             try (InputStream is = in.call()) {
                 Files.copy(is, temp, StandardCopyOption.REPLACE_EXISTING);
             }
             try {
-                Files.move(temp, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+                Files.move(temp, targetPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
             } catch (AtomicMoveNotSupportedException ignored) {
                 // try again, without ATOMIC_MOVE
-                Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING);
+                Files.move(temp, targetPath, StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (Exception e) {
             // if any of the above fails, the temp file remains
