@@ -2,6 +2,8 @@ package glowredman.txloader;
 
 import java.util.concurrent.CompletableFuture;
 
+import javax.annotation.Nonnull;
+
 import cpw.mods.fml.relauncher.FMLLaunchHandler;
 import cpw.mods.fml.relauncher.Side;
 import glowredman.txloader.Asset.Source;
@@ -81,17 +83,17 @@ public class AssetBuilder {
      * blocking the main thread (using {@link CompletableFuture#join() join()}). This is usually only necessary if this
      * method is called after all resources were reloaded.
      * 
-     * @return {@code null} on a dedicated server or a {@link CompletableFuture} which can be used to block the (main)
-     *         thread.
+     * @return A {@link CompletableFuture} which can be used to block the (main) thread.
      * @since 1.9.0
      * @author glowredman
      * @see #add()
      */
+    @Nonnull
     public CompletableFuture<Void> fetch() {
         if (FMLLaunchHandler.side() == Side.CLIENT) {
             return RemoteHandler.fetchAsset(this.asset).future;
         }
         TXLoaderCore.LOGGER.warn("Skipped fetching {} on side SERVER!", this.asset);
-        return null;
+        return CompletableFuture.completedFuture(null);
     }
 }
