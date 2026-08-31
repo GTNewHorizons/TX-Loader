@@ -41,18 +41,6 @@ public class Asset {
     }
 
     @Override
-    public boolean equals(Object obj) {
-        if (!(obj instanceof Asset a)) {
-            return false;
-        }
-        return Objects.equal(this.resourceLocation, a.resourceLocation)
-                && Objects.equal(this.resourceLocationOverride, a.resourceLocationOverride)
-                && this.forceLoad == a.forceLoad
-                && Objects.equal(this.version, a.version)
-                && this.source == a.source;
-    }
-
-    @Override
     public String toString() {
         return Objects.toStringHelper(this).add("resourceLocation", this.resourceLocation)
                 .add("resourceLocationOverride", this.resourceLocationOverride).add("forceLoad", this.forceLoad)
