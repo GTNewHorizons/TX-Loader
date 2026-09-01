@@ -69,7 +69,7 @@ class RemoteHandler {
 
         try {
             // always try to update the manifest because it changes regularly
-            download(MANIFEST_URL, path);
+            download(MANIFEST_URL, JarHandler.txloaderCache, path);
             TXLoaderCore.LOGGER.info("Successfully fetched Minecraft versions.");
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed to update Minecraft versions! Attempting to use cached manifest...", e);
@@ -199,7 +199,7 @@ class RemoteHandler {
                 }
 
                 try {
-                    download(url, path);
+                    download(url, JarHandler.txloaderCache, path);
                 } catch (Exception e) {
                     TXLoaderCore.LOGGER.error(
                             "An error occurred while downloading the version details for version {}!",
@@ -232,7 +232,7 @@ class RemoteHandler {
             }
 
             try {
-                download(details.assetIndex.url, path);
+                download(details.assetIndex.url, JarHandler.txloaderCache, path);
             } catch (Exception e) {
                 TXLoaderCore.LOGGER.error("Failed to download asset index for version {}!", version, e);
                 return null;
@@ -322,14 +322,14 @@ class RemoteHandler {
         TXLoaderCore.LOGGER.debug("Successfully fetched {}", asset.resourceLocation);
     }
 
-    private static void download(String url, Path path) throws Exception {
-        TXLoaderCore.LOGGER.info("Downloading {} to {}", url, path);
+    private static void download(String url, Path cacheDir, Path targetPath) throws Exception {
+        TXLoaderCore.LOGGER.info("Downloading {} to {}", url, targetPath);
         copyWithTempFile(() -> {
             URLConnection connection = new URL(url).openConnection();
             connection.setConnectTimeout(CONNECT_TIMEOUT);
             connection.setReadTimeout(READ_TIMEOUT);
             return connection.getInputStream();
-        }, JarHandler.txloaderCache, path);
+        }, cacheDir, targetPath);
     }
 
     private static void copyWithTempFile(Callable<InputStream> in, Path cacheDir, Path targetPath) throws Exception {
@@ -443,7 +443,7 @@ class RemoteHandler {
             Path dir = JarHandler.txloaderCache.resolve(version);
             Files.createDirectories(dir);
             Path jar = dir.resolve(fileName);
-            RemoteHandler.download(this.url, jar);
+            RemoteHandler.download(this.url, JarHandler.txloaderCache, jar);
             return jar;
         }
     }
@@ -470,7 +470,7 @@ class RemoteHandler {
             sb.append(this.hash, 0, 2);
             sb.append('/');
             sb.append(this.hash);
-            RemoteHandler.download(sb.toString(), path);
+            RemoteHandler.download(sb.toString(), TXLoaderCore.tempDir, path);
         }
     }
 }

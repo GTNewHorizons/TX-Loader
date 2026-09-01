@@ -11,6 +11,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -149,6 +150,13 @@ public class TXLoaderCore implements IFMLLoadingPlugin {
         } catch (IOException e) {
             LOGGER.error("Failed to create resource directories!", e);
             return true;
+        }
+
+        try {
+            FileUtils.cleanDirectory(tempDir.toFile());
+        } catch (Exception e) {
+            // This is not a condition to skip normal startup, so only log the exception and proceed
+            LOGGER.warn("Failed to clean {}", tempDir, e);
         }
 
         if (FMLLaunchHandler.side().isServer()) {
