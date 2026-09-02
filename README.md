@@ -8,7 +8,7 @@ TX Loader
 ### Features
 - Provides a directory which acts as any other resource pack (`./config/txloader/load/`)
 - Provides a directory which overrides all other assets with the same resource locations (`./config/txloader/forceload/`)
-- Official assets can be downloaded automatically at startup from the official Mojang servers (Mojang's [Brand and Asset Guidelines](https://www.minecraft.net/en-us/terms#terms-brand_guidelines) are not violated this way). Pack devs can do this via a JSON config (`./config/txloader/config.json`), mod devs can use a builder class via `glowredman.txloader.TXLoaderCore#getAssetBuilder`
+- Official assets can be downloaded automatically at startup from the official Mojang servers (Mojang's [Brand and Asset Guidelines](https://www.minecraft.net/en-us/terms) are not violated this way). Pack devs can do this via a JSON config (`./config/txloader/config.json`), mod devs can use a builder class via `glowredman.txloader.TXLoaderCore#getAssetBuilder`
 
 ### Config Format
 
@@ -17,7 +17,7 @@ TX Loader
 |resourceLocation|String||Source path|
 |resourceLocationOverride|String|`null`|Destination path, if you want it to be different from the source path|
 |forceLoad|boolean|`false`|If true, this asset will be prioritized over assets from other resource packs|
-|version|String|latest release|The version from which this asset should be taken(valid versions can be found [here](https://launchermeta.mojang.com/mc/game/version_manifest.json))<br>*It is recommended to populate this field*|
+|version|String||The version from which this asset should be taken(valid versions can be found [here](https://launchermeta.mojang.com/mc/game/version_manifest.json))|
 
 *Example config:*
 ```json
@@ -34,3 +34,25 @@ TX Loader
   }
 ]
 ```
+
+### JVM Arguments
+|Name|Default Value|Description|
+|:---|:---|:---|
+|`-Dtxloader.keepalive.io`|10000|How long (in milliseconds) idle file IO threads are kept alive before being terminated|
+|`-Dtxloader.keepalive.net`|10000|How long (in milliseconds) idle network threads are kept alive before being terminated|
+|`-Dtxloader.poolsize.io`|32|Number of file IO threads|
+|`-Dtxloader.poolsize.net`|16|Number of network threads|
+|`-Dtxloader.timeout.connect`|5000|How long (in milliseconds) establishing a connection to a remote resource is attempted|
+|`-Dtxloader.timeout.read`|10000|How long (in milliseconds) beginning to read data from a remote resource is allowed to take before the connection is terminated|
+
+
+### TODO
+In order of importance:
+1. Remove hard network connectivity requirement (see [this](https://github.com/GTNewHorizons/TX-Loader/pull/18#discussion_r3567508914) and the following comment)
+2. Let config-driven assets override mod-driven assets (right now it's the other way around)
+    - Clarify: should mods even be allowed to defined force-loaded assets?
+3. Cache open `JarFile`s
+4. Improve error message if `/tx` command has wrong number of arguments
+5. Allow some assets to be downloaded server-side too (maybe introduce a new flag in `Asset` for it)
+6. Re-add progress bar
+7. Clean up `RemoteHandler`

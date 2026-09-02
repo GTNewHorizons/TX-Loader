@@ -1,5 +1,7 @@
 package glowredman.txloader;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import net.minecraft.command.CommandBase;
@@ -13,8 +15,13 @@ import net.minecraft.util.IChatComponent;
 import net.minecraftforge.client.ClientCommandHandler;
 
 import glowredman.txloader.Asset.Source;
+import glowredman.txloader.CompletableFutureWrapper.State;
+import glowredman.txloader.RemoteHandler.JVersion;
+import glowredman.txloader.RemoteHandler.JVersionManifest;
 
 class CommandTX implements ICommand {
+
+    private List<String> versions;
 
     @Override
     public int compareTo(Object o) {
@@ -62,6 +69,7 @@ class CommandTX implements ICommand {
                 return;
             }
             args = fixSpacesForVersion(args);
+            length = args.length;
             if (length == 0) {
                 sender.addChatMessage(getColoredText("Missing closing Quotation Mark!", EnumChatFormatting.RED));
                 return;
@@ -90,8 +98,13 @@ class CommandTX implements ICommand {
                     asset.forceLoad = args[5].equals("true");
                 }
             }
-            TXLoaderCore.REMOTE_ASSETS.add(asset);
-            sender.addChatMessage(getColoredText("Done. Don't forget to save!", EnumChatFormatting.GREEN));
+            if (RemoteHandler.fetchAsset(asset).state != State.DUPLICATE_ASSET) {
+                ConfigHandler.ASSETS.add(asset);
+                sender.addChatMessage(getColoredText("Done. Don't forget to save!", EnumChatFormatting.GREEN));
+                return;
+            }
+            sender.addChatMessage(
+                    getColoredText("An asset for this resource location is already defined!", EnumChatFormatting.RED));
         }
     }
 
@@ -110,7 +123,7 @@ class CommandTX implements ICommand {
             return null;
         }
         if (length == 2) {
-            return CommandBase.getListOfStringsFromIterableMatchingLastWord(args, RemoteHandler.VERSIONS.keySet());
+            return CommandBase.getListOfStringsFromIterableMatchingLastWord(args, this.listVersions());
         }
         if (length == 3) {
             return CommandBase.getListOfStringsFromIterableMatchingLastWord(args, Source.NAMES);
@@ -187,5 +200,39 @@ class CommandTX implements ICommand {
         }
 
         return fixedArgs;
+    }
+
+    /**
+     * Constructs a list of minecraft versions
+     */
+    private List<String> listVersions() {
+        if (this.versions != null) {
+            // list is already constructed, return it
+            return this.versions;
+        }
+
+        if (!RemoteHandler.VERSIONS_STAGE.isDone()) {
+            // list can't be constructed yet, exit early
+            return Collections.emptyList();
+        }
+
+        JVersionManifest manifest;
+
+        try {
+            manifest = RemoteHandler.VERSIONS_STAGE.join();
+        } catch (Exception e) {
+            // the future didn't complete normally, assign an empty list (to exit early in the future) and return it
+            TXLoaderCore.LOGGER
+                    .warn("An exception occured while getting the version manifest from the CompletableFuture!", e);
+            return this.versions = Collections.emptyList();
+        }
+
+        // convert List<JVersion> into List<String> and return it
+        this.versions = new ArrayList<>(manifest.versions.size());
+        for (JVersion version : manifest.versions) {
+            this.versions.add(version.id);
+        }
+
+        return this.versions;
     }
 }

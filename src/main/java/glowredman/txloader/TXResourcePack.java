@@ -19,6 +19,10 @@ import net.minecraft.util.ResourceLocation;
 
 public class TXResourcePack implements IResourcePack {
 
+    static volatile TXResourcePack instanceNormal;
+    static volatile TXResourcePack instanceForce;
+    volatile boolean dirty;
+
     private final String name;
     private final Path dir;
     private volatile Set<ResourceLocation> resources;
@@ -35,10 +39,19 @@ public class TXResourcePack implements IResourcePack {
 
     @Override
     public boolean resourceExists(ResourceLocation rl) {
-        try {
-            Set<ResourceLocation> indexedResources = resources;
-            if (indexedResources != null) return indexedResources.contains(rl);
+        RemoteHandler.ensureNoBlocking();
 
+        if (this.dirty) {
+            this.indexResources();
+            this.dirty = false;
+        }
+
+        Set<ResourceLocation> indexedResources = this.resources;
+        if (indexedResources != null) {
+            return indexedResources.contains(rl);
+        }
+
+        try {
             return getResourcePath(rl).toFile().exists();
         } catch (InvalidPathException e) {
             /*
@@ -54,14 +67,12 @@ public class TXResourcePack implements IResourcePack {
 
     @Override
     public Set<String> getResourceDomains() {
-        if (TXLoaderCore.isRemoteReachable) {
-            RemoteHandler.getAssets();
-        }
-        indexResources();
+        RemoteHandler.ensureNoBlocking();
+        this.indexResources();
 
         Set<String> resourceDomains = new HashSet<>();
-        try (Stream<Path> dirs = Files.list(this.dir).filter(Files::isDirectory)) {
-            dirs.forEach(p -> resourceDomains.add(p.getFileName().toString()));
+        try (Stream<Path> dirs = Files.list(this.dir)) {
+            dirs.filter(Files::isDirectory).forEach(p -> resourceDomains.add(p.getFileName().toString()));
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed to get resource domains of directory {}", this.dir, e);
         }
@@ -84,9 +95,9 @@ public class TXResourcePack implements IResourcePack {
                 indexedResources
                         .add(new ResourceLocation(pathString.substring(rootLength, separatorIndex), resourcePath));
             });
-            resources = indexedResources;
+            this.resources = indexedResources;
         } catch (Exception e) {
-            resources = null;
+            this.resources = null;
             TXLoaderCore.LOGGER.error("Failed to index resources of directory {}", this.dir, e);
         }
     }

@@ -1,14 +1,19 @@
 package glowredman.txloader;
 
+import java.util.concurrent.CompletableFuture;
+
+import javax.annotation.Nonnull;
+
+import cpw.mods.fml.relauncher.FMLLaunchHandler;
+import cpw.mods.fml.relauncher.Side;
 import glowredman.txloader.Asset.Source;
 
 public class AssetBuilder {
 
     private final Asset asset;
 
-    AssetBuilder(String resourceLocation) {
-        this.asset = new Asset(resourceLocation, RemoteHandler.latestRelease, Source.ASSET);
-        this.asset.addedByMod = true;
+    AssetBuilder(String resourceLocation, String version) {
+        this.asset = new Asset(resourceLocation, version, Source.ASSET);
     }
 
     /**
@@ -37,10 +42,13 @@ public class AssetBuilder {
 
     /**
      *
+     * @deprecated Not needed anymore, version is now a required argument of {@link #AssetBuilder(String, String)}.
      * @param version The Minecraft version in which the asset can be found. Defaults to the latest release.
      * @return This {@link AssetBuilder} object to allow chaining of method calls
      * @author glowredman
+     * @see TXLoaderCore#getAssetBuilder(String, String)
      */
+    @Deprecated
     public AssetBuilder setVersion(String version) {
         this.asset.version = version;
         return this;
@@ -60,11 +68,32 @@ public class AssetBuilder {
     }
 
     /**
-     * Adds this {@link Asset} to the list of remote assets to load.
+     * Queues this {@link Asset} to be fetched as soon as possible (if it doesn't already exist).
      * 
      * @author glowredman
+     * @see #fetch()
      */
     public void add() {
-        TXLoaderCore.REMOTE_ASSETS.add(this.asset);
+        this.fetch();
+    }
+
+    /**
+     * Queues this {@link Asset} to be fetched as soon as possible (if it doesn't already exist). Unlike {@link #add()},
+     * this method returns a {@link CompletableFuture}. It can be used to ensure an {@link Asset} has been fetched by
+     * blocking the main thread (using {@link CompletableFuture#join() join()}). This is usually only necessary if this
+     * method is called after all resources were reloaded.
+     * 
+     * @return A {@link CompletableFuture} which can be used to block the (main) thread.
+     * @since 1.9.0
+     * @author glowredman
+     * @see #add()
+     */
+    @Nonnull
+    public CompletableFuture<Void> fetch() {
+        if (FMLLaunchHandler.side() == Side.CLIENT) {
+            return RemoteHandler.fetchAsset(this.asset).future;
+        }
+        TXLoaderCore.LOGGER.warn("Skipped fetching {} on side SERVER!", this.asset);
+        return CompletableFuture.completedFuture(null);
     }
 }
