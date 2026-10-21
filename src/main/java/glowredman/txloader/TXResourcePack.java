@@ -5,9 +5,12 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.FileVisitOption;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -83,23 +86,48 @@ public class TXResourcePack implements IResourcePack {
         Set<ResourceLocation> indexedResources = new HashSet<>();
         String separator = this.dir.getFileSystem().getSeparator();
         int rootLength = this.dir.toString().length() + separator.length();
-        boolean replaceSeparator = !separator.equals("/");
-        try (Stream<Path> paths = Files.walk(this.dir, FileVisitOption.FOLLOW_LINKS)) {
-            paths.skip(1).forEach(path -> {
-                String pathString = path.toString();
-                int separatorIndex = pathString.indexOf(separator, rootLength);
-                if (separatorIndex < 0) return; // skipping domain paths, can't build a RL with it
+        try {
+            /*
+             * Walking everything with FOLLOW_LINKS checks each directory against all its parents for loops, which is
+             * slow on Windows. Only symlinked directories need that.
+             */
+            Files.walkFileTree(this.dir, new SimpleFileVisitor<Path>() {
 
-                String resourcePath = pathString.substring(separatorIndex + separator.length());
-                if (replaceSeparator) resourcePath = resourcePath.replace(separator, "/");
-                indexedResources
-                        .add(new ResourceLocation(pathString.substring(rootLength, separatorIndex), resourcePath));
+                @Override
+                public FileVisitResult preVisitDirectory(Path path, BasicFileAttributes attrs) {
+                    if (!path.equals(TXResourcePack.this.dir)) {
+                        addResource(indexedResources, path, separator, rootLength);
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFile(Path path, BasicFileAttributes attrs) throws IOException {
+                    addResource(indexedResources, path, separator, rootLength);
+                    if (attrs.isSymbolicLink() && Files.isDirectory(path)) {
+                        try (Stream<Path> linked = Files.walk(path, FileVisitOption.FOLLOW_LINKS)) {
+                            linked.skip(1).forEach(p -> addResource(indexedResources, p, separator, rootLength));
+                        }
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
             });
             this.resources = indexedResources;
         } catch (Exception e) {
             this.resources = null;
             TXLoaderCore.LOGGER.error("Failed to index resources of directory {}", this.dir, e);
         }
+    }
+
+    private static void addResource(Set<ResourceLocation> indexedResources, Path path, String separator,
+            int rootLength) {
+        String pathString = path.toString();
+        int separatorIndex = pathString.indexOf(separator, rootLength);
+        if (separatorIndex < 0) return; // skipping domain paths, can't build a RL with it
+
+        String resourcePath = pathString.substring(separatorIndex + separator.length());
+        if (!separator.equals("/")) resourcePath = resourcePath.replace(separator, "/");
+        indexedResources.add(new ResourceLocation(pathString.substring(rootLength, separatorIndex), resourcePath));
     }
 
     @Override
