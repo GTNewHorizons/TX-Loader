@@ -2,12 +2,14 @@ package glowredman.txloader;
 
 import java.awt.image.BufferedImage;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.FileVisitOption;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -25,20 +27,30 @@ public class TXResourcePack implements IResourcePack {
 
     private final String name;
     private final Path dir;
+    private final Set<String> disabledDomains;
     private volatile Set<ResourceLocation> resources;
 
     public TXResourcePack(String name, Path dir) {
+        this(name, dir, Collections.emptySet());
+    }
+
+    TXResourcePack(String name, Path dir, Set<String> disabledDomains) {
         this.name = name;
         this.dir = dir;
+        this.disabledDomains = disabledDomains;
     }
 
     @Override
     public InputStream getInputStream(ResourceLocation rl) throws IOException {
+        if (disabledDomains.contains(rl.getResourceDomain())) {
+            throw new FileNotFoundException(rl.toString());
+        }
         return new FileInputStream(this.getResourcePath(rl).toFile());
     }
 
     @Override
     public boolean resourceExists(ResourceLocation rl) {
+        if (disabledDomains.contains(rl.getResourceDomain())) return false;
         RemoteHandler.ensureNoBlocking();
 
         if (this.dirty) {
@@ -72,7 +84,8 @@ public class TXResourcePack implements IResourcePack {
 
         Set<String> resourceDomains = new HashSet<>();
         try (Stream<Path> dirs = Files.list(this.dir)) {
-            dirs.filter(Files::isDirectory).forEach(p -> resourceDomains.add(p.getFileName().toString()));
+            dirs.filter(Files::isDirectory).map(p -> p.getFileName().toString())
+                    .filter(domain -> !disabledDomains.contains(domain)).forEach(resourceDomains::add);
         } catch (Exception e) {
             TXLoaderCore.LOGGER.error("Failed to get resource domains of directory {}", this.dir, e);
         }
@@ -89,11 +102,12 @@ public class TXResourcePack implements IResourcePack {
                 String pathString = path.toString();
                 int separatorIndex = pathString.indexOf(separator, rootLength);
                 if (separatorIndex < 0) return; // skipping domain paths, can't build a RL with it
+                String domain = pathString.substring(rootLength, separatorIndex);
+                if (disabledDomains.contains(domain)) return;
 
                 String resourcePath = pathString.substring(separatorIndex + separator.length());
                 if (replaceSeparator) resourcePath = resourcePath.replace(separator, "/");
-                indexedResources
-                        .add(new ResourceLocation(pathString.substring(rootLength, separatorIndex), resourcePath));
+                indexedResources.add(new ResourceLocation(domain, resourcePath));
             });
             this.resources = indexedResources;
         } catch (Exception e) {
