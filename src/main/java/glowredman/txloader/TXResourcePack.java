@@ -42,6 +42,7 @@ public class TXResourcePack implements IResourcePack {
 
     @Override
     public InputStream getInputStream(ResourceLocation rl) throws IOException {
+        // Direct callers can bypass resourceExists().
         if (disabledDomains.contains(rl.getResourceDomain())) {
             throw new FileNotFoundException(rl.toString());
         }
