@@ -25,7 +25,8 @@ public class MinecraftHook {
         resourcePackList.add(
                 TXResourcePack.instanceForce = new TXResourcePack(
                         "TX Loader Forced Resources",
-                        TXLoaderCore.forceResourcesDir));
+                        TXLoaderCore.forceResourcesDir,
+                        ForcedResourcesConfig.DISABLED_DOMAINS));
         return resourcePackList;
     }
 }
