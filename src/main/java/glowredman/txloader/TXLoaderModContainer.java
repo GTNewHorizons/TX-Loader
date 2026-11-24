@@ -48,6 +48,11 @@ public class TXLoaderModContainer extends DummyModContainer {
     }
 
     @Override
+    public String getGuiClassName() {
+        return "glowredman.txloader.ForcedResourcesGuiFactory";
+    }
+
+    @Override
     public boolean registerBus(EventBus bus, LoadController controller) {
         bus.register(this);
         return true;
